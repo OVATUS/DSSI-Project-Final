@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+
+{# ใช้ layout พิเศษสำหรับหน้า login #}
+{% block layout %}
+<div class="min-h-screen bg-linear-to-b from-blue-500 to-blue-300 flex items-center justify-center">
+
+  <div class="w-full max-w-6xl px-6 md:px-10 py-10">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+
+      {# ด้านซ้าย: Logo + คำอธิบาย #}
+      <div class="text-white">
+        <h1 class="text-4xl md:text-5xl font-extrabold tracking-wide">
+          Work Wai D
+        </h1>
+        <p class="mt-4 text-sm md:text-base text-blue-100 max-w-md">
+          ระบบที่ช่วยจัดการงานของคุณให้เป็นระเบียบ  
+          ติดตามความคืบหน้า และวางแผนแต่ละวันได้ง่ายขึ้น
+        </p>
+      </div>
+
+      {# ด้านขวา: การ์ด Login #}
+      <div class="flex justify-center md:justify-end">
+        <div class="bg-white/80 backdrop-blur-md rounded-2xl shadow-2xl px-6 py-7 md:px-8 md:py-9 w-full max-w-sm">
+
+          <h2 class="text-xl md:text-2xl font-bold mb-6 text-center text-gray-800">
+            Login Work Wai D
+          </h2>
+
+          <form method="post" class="space-y-4">
+            {% csrf_token %}
+
+            {# Username #}
+            <div class="text-sm">
+              <label for="{{ form.username.id_for_label }}" class="block mb-1 text-gray-700">
+                Username
+              </label>
+              {{ form.username }}
+            </div>
+
+            {# Password #}
+            <div class="text-sm">
+              <label for="{{ form.password.id_for_label }}" class="block mb-1 text-gray-700">
+                Password
+              </label>
+              {{ form.password }}
+            </div>
+
+            {# ปุ่ม login #}
+            <button
+              type="submit"
+              class="mt-4 w-full bg-blue-500 hover:bg-blue-600 text-white py-2.5 rounded-full text-sm font-semibold shadow-md transition"
+            >
+              login
+            </button>
+          </form>
+
+          <p class="mt-5 text-center text-xs md:text-sm text-gray-700">
+            ยังไม่มีบัญชี?
+            <a href="{% url 'register' %}" class="text-blue-700 font-semibold hover:underline">
+              สมัครสมาชิก
+            </a>
+          </p>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+{% endblock %}

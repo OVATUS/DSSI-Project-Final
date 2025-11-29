@@ -1,0 +1,72 @@
+{# การ์ดบอร์ด 1 ใบ + เมนู ⋯ #}
+<div class="relative">
+  <!-- ปุ่มจุด 3 จุด -->
+  <button
+    type="button"
+    @click.stop="menuBoardId === {{ board.id }} ? menuBoardId = null : menuBoardId = {{ board.id }}"
+    class="absolute right-2 top-2 z-10 w-8 h-8 rounded-full bg-black/40 text-white flex items-center justify-center hover:bg-black/60"
+  >
+    ⋯
+  </button>
+
+  <!-- เมนู แก้ไข / ลบ -->
+  <div
+    x-show="menuBoardId === {{ board.id }}"
+    x-transition
+    @click.outside="menuBoardId = null"
+    class="absolute right-2 top-10 z-20 bg-white rounded-md shadow-lg border border-gray-200 w-36 text-sm"
+  >
+    <!-- แก้ไข = เปิด popup edit -->
+    <button
+      type="button"
+      class="block w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-800"
+      @click.prevent="
+        menuBoardId = null;
+        openEdit = true;
+        editActionUrl = '{% url 'board_update' board.id %}';
+        editName = '{{ board.name|escapejs }}';
+        editDescription = '{{ board.description|default_if_none:''|escapejs }}';
+        editCoverPreview = '{{ board.cover_image.url|default_if_none:'' }}';
+      "
+    >
+      แก้ไข
+    </button>
+
+    <!-- ลบ = เปิด popup ลบ -->
+    <button
+      type="button"
+      class="block w-full text-left px-3 py-2 hover:bg-red-50 text-red-600"
+      @click.prevent="
+        menuBoardId = null;
+        openDelete = true;
+        deleteUrl = '{% url 'board_delete' board.id %}';
+      "
+    >
+      ลบ
+    </button>
+  </div>
+
+  <!-- การ์ดโปรเจกต์ -->
+  <div
+    class="w-full bg-gray-800 rounded-md overflow-hidden shadow cursor-pointer hover:scale-105 transition"
+    @click="window.location='{% url 'board_detail' board.id %}'"
+  >
+    {% if board.cover_image %}
+      <img
+        src="{{ board.cover_image.url }}"
+        alt="{{ board.name }}"
+        class="w-full h-28 object-cover"
+      />
+    {% else %}
+      <img
+        src="https://source.unsplash.com/random/300x200/?project"
+        alt=""
+        class="w-full h-28 object-cover"
+      />
+    {% endif %}
+
+    <div class="p-2 bg-gray-900 text-white text-sm font-semibold">
+      {{ board.name }}
+    </div>
+  </div>
+</div>

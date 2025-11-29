@@ -1,0 +1,38 @@
+{# templates/boards/components/popup_list_delete.html #}
+<div
+  x-cloak
+  x-show="listDeleteOpen"
+  x-transition.opacity
+  class="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+>
+  <div
+    @click.outside="listDeleteOpen = false"
+    class="bg-white rounded-xl shadow-xl w-full max-w-sm p-6"
+  >
+    <h2 class="text-lg font-bold mb-4 text-center">
+      ลบลิสต์นี้?
+    </h2>
+
+    <p class="text-sm text-gray-700 mb-6 text-center">
+      งานทั้งหมดในลิสต์นี้จะถูกลบไปด้วย คุณแน่ใจหรือไม่?
+    </p>
+
+    <form method="post" :action="listDeleteActionUrl" class="flex justify-between">
+      {% csrf_token %}
+      <button
+        type="button"
+        @click="listDeleteOpen = false"
+        class="px-4 py-2 rounded-full border border-gray-400 text-gray-700 text-sm"
+      >
+        ยกเลิก
+      </button>
+
+      <button
+        type="submit"
+        class="px-4 py-2 rounded-full bg-red-600 text-white text-sm font-semibold"
+      >
+        ลบ
+      </button>
+    </form>
+  </div>
+</div>

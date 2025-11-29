@@ -1,0 +1,37 @@
+{% load static tailwind_tags %}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>{% block title %}My App{% endblock %}</title>
+
+    <style>
+      [x-cloak] {
+        display: none !important;
+      }
+    </style>
+
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <script defer src="{% static 'js/main.js' %}"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+
+    {% tailwind_css %}
+  </head>
+
+  <body class="bg-gray-100 min-h-screen">
+    <div class="flex flex-col min-h-screen">
+      {# layout หลักของทุกหน้า (navbar + sidebar + main) #} {% block layout %}
+      {% block navbar %} {% include "components/navbar.html" %} {% endblock %}
+
+      <div class="flex flex-1">
+        {% block sidebar %} {% include "components/sidebar.html" %} {% endblock %}
+
+        <main class="flex-1">{% block content %}{% endblock %}</main>
+      </div>
+
+      {% endblock %}
+    </div>
+  </body>
+</html>

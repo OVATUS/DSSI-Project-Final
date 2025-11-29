@@ -1,0 +1,201 @@
+{# templates/boards/board_detail.html #}
+{% extends "base.html" %}
+
+{# ซ่อน sidebar ในหน้า board detail เพื่อพื้นที่การทำงานที่กว้างขึ้น #}
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+<div
+  x-data="boardDetailPage({
+    moveUrl: '{% url "task_move" %}',
+    listMoveUrl: '{% url "list_reorder" board.id %}'
+  })"
+  class="h-screen flex flex-col bg-linear-to-br from-slate-50 to-slate-200 overflow-hidden"
+>
+  {# --- STYLE สำหรับ Custom Scrollbar (เฉพาะหน้านี้) --- #}
+  <style>
+    /* ปรับแต่ง Scrollbar แนวนอนของบอร์ด */
+    .board-scroll::-webkit-scrollbar {
+      height: 12px;
+    }
+    .board-scroll::-webkit-scrollbar-track {
+      background: rgba(0,0,0,0.05);
+      border-radius: 10px;
+    }
+    .board-scroll::-webkit-scrollbar-thumb {
+      background: rgba(0,0,0,0.2);
+      border-radius: 10px;
+      border: 3px solid transparent;
+      background-clip: content-box;
+    }
+    .board-scroll::-webkit-scrollbar-thumb:hover {
+      background-color: rgba(0,0,0,0.3);
+    }
+  </style>
+
+  {# --- HEADER / TOOLBAR --- #}
+  <header class="h-16 shrink-0 bg-white/80 backdrop-blur-md border-b border-gray-200 flex items-center justify-between px-6 shadow-sm z-10">
+    <div class="flex items-center gap-4">
+      <div class="bg-indigo-600 text-white p-2 rounded-lg shadow-sm">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
+        </svg>
+      </div>
+      <h1 class="text-xl font-bold text-gray-800 tracking-tight">
+        {{ board.name }}
+      </h1>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <button
+        type="button"
+        class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white transition-colors rounded-md px-4 py-2 text-sm font-medium shadow-sm"
+        @click="
+          listModalMode = 'create';
+          listTitle = '';
+          listActionUrl = '{% url "list_create" board.id %}';
+          listModalOpen = true;
+        "
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        </svg>
+        <span>เพิ่มลิสต์ใหม่</span>
+      </button>
+      
+      <button class="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  {# --- MAIN BOARD AREA (Horizontal Scroll) --- #}
+  <main class="flex-1 overflow-x-auto overflow-y-hidden board-scroll">
+    <div class="h-full flex items-start gap-6 px-6 py-6 min-w-max">
+
+      {% for lst in lists %}
+        {# --- LIST COLUMN --- #}
+        <div
+          class="flex flex-col w-80 max-h-full bg-gray-100/90 rounded-xl shadow-sm border border-gray-200/60 shrink-0"
+          @dragover.prevent
+          @drop="onDrop($event, {{ lst.id }})"
+        >
+          
+          {# HEADER ของ List #}
+          <div 
+            class="p-3 pl-4 flex items-center justify-between cursor-move group"
+            draggable="true"
+            @dragstart="onDragStartList($event, {{ lst.id }})"
+          >
+            <h2 class="font-bold text-gray-700 text-sm truncate uppercase tracking-wide">
+              {{ lst.title }}
+            </h2>
+            
+            <div class="relative x-data="{ openMenu: false }>
+                <button class="text-gray-400 hover:text-gray-700 p-1 rounded hover:bg-gray-200 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
+                    </svg>
+                </button>
+                
+                <div class="absolute right-0 top-full mt-1 w-32 bg-white rounded-md shadow-xl border border-gray-100 z-20 hidden group-hover:block">
+                     <button
+                        type="button"
+                        class="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                        @click="
+                          listModalMode = 'edit';
+                          listTitle = '{{ lst.title|escapejs }}';
+                          listActionUrl = '{% url "list_update" lst.id %}';
+                          listModalOpen = true;
+                        "
+                      >
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                        แก้ไขชื่อ
+                      </button>
+                      <button
+                        type="button"
+                        class="w-full text-left px-4 py-2 text-xs text-red-600 hover:bg-red-50 flex items-center gap-2 rounded-b-md"
+                        @click="
+                          listDeleteActionUrl = '{% url "list_delete" lst.id %}';
+                          listDeleteOpen = true;
+                        "
+                      >
+                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        ลบลิสต์
+                      </button>
+                </div>
+            </div>
+          </div>
+
+          {# CARD AREA (Scrollable vertical if many tasks) #}
+          <div class="flex-1 overflow-y-auto px-2 pb-2 space-y-2 min-h-[50px] custom-scrollbar">
+            {% for task in lst.tasks.all %}
+              <div class="transform transition hover:-translate-y-1 duration-200">
+                  {% include "boards/components/task_card.html" with task=task lst=lst %}
+              </div>
+            {% empty %}
+              <div class="h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center text-gray-400 text-xs">
+                ลากการ์ดมาวางที่นี่
+              </div>
+            {% endfor %}
+          </div>
+
+          {# FOOTER: ปุ่มเพิ่มการ์ด #}
+          <div class="p-2 pt-1">
+            <button
+              type="button"
+              class="w-full flex items-center gap-2 text-gray-500 hover:text-gray-800 hover:bg-gray-200/80 rounded-md px-3 py-2 text-sm transition-colors text-left"
+              @click="
+                taskMode = 'create';
+                taskModalOpen = true;
+                taskListTitle = '{{ lst.title|escapejs }}';
+                taskActionUrl = '{% url 'task_create' lst.id %}';
+                taskTitle = '';
+                taskDescription = '';
+                taskAssignedTo = '';
+                taskPriority = 'medium';
+                taskDueDate = '';
+              "
+            >
+              <span class="text-lg leading-none">+</span>
+              เพิ่มการ์ด
+            </button>
+          </div>
+
+        </div>
+      {% empty %}
+        <div class="flex flex-col items-center justify-center w-full h-full text-gray-500 opacity-60">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+            <p class="text-lg font-medium">ยังไม่มีรายการ</p>
+            <p class="text-sm">กดปุ่ม "เพิ่มลิสต์ใหม่" ด้านบนเพื่อเริ่มใช้งาน</p>
+        </div>
+      {% endfor %}
+
+      {# Placeholder สำหรับเพิ่ม List ใหม่ (เผื่ออยากให้มีปุ่มต่อท้ายแถวเหมือน Trello) #}
+      <button 
+        type="button"
+        class="shrink-0 w-80 h-12 bg-white/40 hover:bg-white/60 border border-dashed border-gray-400/50 rounded-xl flex items-center justify-center gap-2 text-gray-600 font-medium transition-all"
+        @click="
+            listModalMode = 'create';
+            listTitle = '';
+            listActionUrl = '{% url "list_create" board.id %}';
+            listModalOpen = true;
+        "
+      >
+        + เพิ่มลิสต์อีกรายการ
+      </button>
+
+    </div>
+  </main>
+
+  {# POPUP ต่าง ๆ (Include เดิม) #}
+  {% include "boards/components/popup_task_form.html" %}
+  {% include "boards/components/popup_list_form.html" %}
+  {% include "boards/components/popup_list_delete.html" %}
+
+</div>
+{% endblock %}

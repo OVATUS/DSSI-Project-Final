@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div x-data="projectPage()" class="relative p-4">
+
+  <!-- 🔍 Search Bar -->
+  <div class="flex justify-center mt-4">
+    <div class="w-full max-w-2xl relative">
+      <input
+        type="text"
+        placeholder="ค้นหางานของคุณ"
+        class="w-full py-2 pl-10 pr-4 rounded-full bg-gray-200 outline-none focus:ring-2 focus:ring-blue-400"
+      />
+      <span class="absolute left-3 top-2.5 text-gray-500 text-xl"> 🔍 </span>
+    </div>
+  </div>
+
+  <!-- Favorite Projects -->
+  <div class="mt-8">
+    <h2 class="text-lg font-semibold">Project ที่ติดดาว ⭐</h2>
+    <hr class="border-gray-400 mt-2" />
+
+    {% if starred_boards %}
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-4">
+        {% for board in starred_boards %}
+          <div
+            class="bg-blue-600 text-white rounded-md p-3 cursor-pointer hover:opacity-90 transition"
+          >
+            <h3 class="font-bold text-sm">{{ board.name }}</h3>
+            <p class="text-xs opacity-80 mt-1">
+              {{ board.description|default:"ไม่มีคำอธิบาย" }}
+            </p>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="text-sm text-gray-500 mt-3">ไม่มีโปรเจกต์ที่ติดดาว</p>
+    {% endif %}
+  </div>
+
+  <!-- My Project -->
+  <div class="mt-10">
+    <h2 class="text-lg font-semibold">My Project</h2>
+    <hr class="border-gray-400 mt-2" />
+
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-6">
+      {% for board in boards %}
+        {% include "boards/components/board_card.html" with board=board %}
+      {% endfor %}
+
+      <!-- การ์ดสร้างโปรเจกต์ -->
+      <button
+        type="button"
+        @click="openCreate = true"
+        class="flex flex-col items-center justify-center bg-gray-200 border border-gray-400 rounded-md h-32 hover:bg-gray-300 transition w-full"
+      >
+        <div class="text-3xl font-bold text-gray-700">+</div>
+        <div class="text-gray-700 text-sm mt-1">สร้างบอร์ดงาน</div>
+      </button>
+    </div>
+  </div>
+
+  {# popup ต่าง ๆ ถูกแยกออก #}
+  {% include "boards/components/popup_create_board.html" %}
+  {% include "boards/components/popup_edit_board.html" %}
+  {% include "boards/components/popup_delete_board.html" %}
+
+</div>
+{% endblock %}

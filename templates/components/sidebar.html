@@ -1,0 +1,33 @@
+<aside class="w-56 bg-[#2A2A2A] text-gray-200 pt-6">
+
+    <nav class="flex flex-col gap-2 px-3 text-sm font-medium">
+
+        <a href="{% url 'home' %}"
+           class="flex items-center h-10 px-4 rounded-full
+                  {% if request.resolver_match.url_name == 'home' %}
+                      bg-gray-100 text-gray-900 font-semibold
+                  {% else %}
+                      hover:bg-gray-700 transition
+                  {% endif %}
+            ">
+            Home
+        </a>
+
+        <a href="{% url 'home' %}"
+           class="flex items-center h-10 px-4 rounded-full hover:bg-gray-700 transition">
+            My Tasks
+        </a>
+
+        <a href=''
+           class="flex items-center h-10 px-4 rounded-full hover:bg-gray-700 transition">
+            Reporting
+        </a>
+
+        <a href="{% url 'project_page' %}"
+           class="flex items-center h-10 px-4 rounded-full hover:bg-gray-700 transition">
+            Project
+        </a>
+
+    </nav>
+
+</aside>

@@ -1,0 +1,87 @@
+{# Popup สร้างบอร์ดใหม่ #}
+<div
+  x-cloak
+  x-show="openCreate"
+  x-transition.opacity
+  class="fixed inset-0 bg-black/40 flex items-center justify-center z-40"
+>
+  <div
+    @click.outside="openCreate = false"
+    class="bg-white rounded-xl shadow-xl border-[6px] border-[#0094FF] w-full max-w-md"
+  >
+    <!-- หัวกล่อง -->
+    <div class="bg-[#0094FF] text-white text-center py-2 rounded-t-lg">
+      <h2 class="font-bold text-lg">สร้าง Project ใหม่</h2>
+    </div>
+
+    <div class="p-6 space-y-4">
+      <!-- Preview รูปปก -->
+      <div class="w-full mb-2">
+        <p class="text-xs text-gray-600 mb-1">ตัวอย่างรูปปก</p>
+        <div
+          class="w-full h-32 rounded-md border border-dashed border-gray-300 flex items-center justify-center bg-gray-50 overflow-hidden"
+        >
+          <template x-if="coverPreview">
+            <img :src="coverPreview" class="w-full h-full object-cover" />
+          </template>
+          <template x-if="!coverPreview">
+            <span class="text-xs text-gray-400">ยังไม่ได้เลือกรูป</span>
+          </template>
+        </div>
+      </div>
+
+      {% if form.errors %}
+        <div class="mb-2 text-xs text-red-600">
+          กรุณาตรวจสอบข้อมูลที่กรอกให้ถูกต้อง
+        </div>
+      {% endif %}
+
+      <form
+        method="post"
+        enctype="multipart/form-data"
+        class="space-y-4"
+        action="{% url 'board_create' %}"
+      >
+        {% csrf_token %}
+
+        <div>
+          <label class="block text-sm font-semibold mb-1">อัปโหลดรูปปก</label>
+          <input
+            type="file"
+            name="cover_image"
+            accept="image/*"
+            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0094FF]"
+            @change="if ($event.target.files[0]) { coverPreview = URL.createObjectURL($event.target.files[0]) }"
+          />
+          {% if form.cover_image.errors %}
+            <p class="text-xs text-red-600 mt-1">
+              {{ form.cover_image.errors.0 }}
+            </p>
+          {% endif %}
+        </div>
+
+        <div>
+          <label class="block text-sm font-semibold mb-1">ชื่อ Project</label>
+          {{ form.name }}
+        </div>
+
+        <div class="flex justify-end gap-3 pt-2">
+          <button
+            type="button"
+            @click="openCreate = false; coverPreview = null;"
+            class="px-4 py-1.5 rounded-full border border-gray-400 text-gray-700 text-sm"
+          >
+            ยกเลิก
+          </button>
+
+          <button
+            type="submit"
+            class="px-6 py-1.5 rounded-full bg-[#0094FF] text-white text-sm font-semibold"
+          >
+            บันทึก
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

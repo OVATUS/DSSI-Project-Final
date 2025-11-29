@@ -1,0 +1,40 @@
+{# templates/boards/task_form.html #}
+{% extends "base.html" %}
+
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+<div class="fixed inset-0 bg-black/40 flex items-center justify-center z-40">
+    <div class="bg-white rounded-xl shadow-xl border-[5px] border-[#0094FF] w-full max-w-md">
+
+        <div class="bg-[#0094FF] text-white text-center py-2 rounded-t-lg">
+            <h2 class="font-bold text-lg">
+                {% if form.instance.pk %}แก้ไข Task{% else %}เพิ่ม Task ใหม่{% endif %}
+            </h2>
+        </div>
+
+        <div class="p-6">
+            <p class="text-xs text-gray-600 mb-3">
+                List: {{ list.title }}
+            </p>
+
+            <form method="post" class="space-y-4">
+                {% csrf_token %}
+                {{ form.as_p }}
+
+                <div class="flex justify-end gap-3 pt-2">
+                    <a href="{% url 'board_detail' list.board.id %}"
+                       class="px-4 py-1.5 rounded-full border border-gray-400 text-gray-700 text-sm">
+                        ยกเลิก
+                    </a>
+                    <button type="submit"
+                            class="px-6 py-1.5 rounded-full bg-[#0094FF] text-white text-sm font-semibold">
+                        บันทึก
+                    </button>
+                </div>
+            </form>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

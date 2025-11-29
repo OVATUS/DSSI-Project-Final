@@ -1,0 +1,28 @@
+{# templates/boards/components/task_card.html #}
+{# ต้องถูก include ด้วย with task=task lst=lst #}
+<div
+  class="bg-white rounded-full px-3 py-1 text-xs shadow cursor-pointer hover:bg-gray-50 grid grid-cols-2 justify-between items-center"
+  draggable="true"
+  @dragstart="onDragStartTask($event, {{ task.id }})"
+  @click="
+    taskMode = 'edit';
+    taskModalOpen = true;
+    taskListTitle = '{{ lst.title|escapejs }}';
+    taskActionUrl = '{% url 'task_update' task.id %}';
+    taskTitle = '{{ task.title|escapejs }}';
+    taskDescription = '{{ task.description|default_if_none:''|escapejs }}';
+    taskAssignedTo = '{{ task.assigned_to_id|default:'' }}';
+    taskPriority = '{{ task.priority }}';
+    taskDueDate = '{{ task.due_date|default_if_none:''|date:'Y-m-d\\TH:i' }}';
+  "
+>
+  <span class="truncate text-[12px] max-w-[150px] max-h-10">
+    {{ task.title }}
+  </span>
+  <span class="text-[12px] text-gray-500 max-h-10">
+    {{ task.get_priority_display }}
+  </span>
+  <span class="truncate text-[12px] max-w-[150px] max-h-10">
+    คนที่รับผิดชอบ {{ task.assigned_to_id }}
+  </span>
+</div>

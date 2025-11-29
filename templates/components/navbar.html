@@ -1,0 +1,14 @@
+<header class="flex items-center justify-between px-6 h-14 bg-[#0094FF] text-white">
+    <div class="text-2xl font-extrabold tracking-wider">
+        <a href ={% url 'home' %}>
+            WORK WAI D
+        </a>
+    </div>
+
+    <div class="flex items-center gap-3">
+        <span class="text-sm font-semibold uppercase">{{ request.user.username }}</span>
+        <div  class="w-8 h-8 rounded-full bg-white overflow-hidden">
+            <a href={% url 'profile' %}><img src="{{ request.user.profile_image.url }}" class="w-full h-full object-cover"> </a>
+        </div>
+    </div>
+</header>

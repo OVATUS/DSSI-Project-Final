@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+<div class="fixed inset-0 bg-black/40 flex items-center justify-center z-40">
+
+    <div class="bg-white w-full max-w-md rounded-xl shadow-xl border-[5px] border-[#0094FF]">
+
+        <!-- หัวกล่อง -->
+        <div class="bg-[#0094FF] text-white text-center py-2 rounded-t-lg">
+            <h2 class="font-bold text-lg">
+                {% if form.instance.pk %}
+                    แก้ไขลิสต์
+                {% else %}
+                    เพิ่มลิสต์ใหม่
+                {% endif %}
+            </h2>
+        </div>
+
+        <!-- เนื้อหา -->
+        <div class="p-6">
+
+            <form method="post" class="space-y-4">
+                {% csrf_token %}
+
+                <div>
+                    <label class="block text-sm font-medium mb-1">ชื่อลิสต์</label>
+                    {{ form.title }}
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-1">ตำแหน่งลิสต์</label>
+                    {{ form.position }}
+                </div>
+
+                <div class="flex justify-end gap-3 pt-4">
+                    <a href="{% url 'board_detail' board.id %}"
+                       class="px-4 py-1.5 rounded-full border border-gray-400 text-gray-700 text-sm">
+                        ยกเลิก
+                    </a>
+
+                    <button type="submit"
+                            class="px-6 py-1.5 rounded-full bg-[#0094FF] text-white text-sm font-semibold">
+                        บันทึก
+                    </button>
+                </div>
+            </form>
+
+        </div>
+
+    </div>
+
+</div>
+{% endblock %}

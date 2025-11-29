@@ -1,0 +1,36 @@
+{# Popup ลบบอร์ด #}
+<div
+  x-cloak
+  x-show="openDelete"
+  x-transition.opacity
+  class="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+>
+  <div
+    @click.outside="openDelete = false"
+    class="bg-white rounded-xl shadow-xl w-full max-w-sm p-6"
+  >
+    <h2 class="text-lg font-bold mb-4 text-center">ลบบอร์ดนี้ ?</h2>
+
+    <p class="text-sm text-gray-700 mb-6 text-center">
+      แน่ใจหรือไม่ว่าต้องการลบบอร์ดนี้? ข้อมูลทั้งหมดในบอร์ดจะถูกลบไปด้วย
+    </p>
+
+    <form method="post" :action="deleteUrl" class="flex justify-between">
+      {% csrf_token %}
+      <button
+        type="button"
+        @click="openDelete = false"
+        class="px-4 py-2 rounded-full border border-gray-400 text-gray-700 text-sm"
+      >
+        ยกเลิก
+      </button>
+
+      <button
+        type="submit"
+        class="px-4 py-2 rounded-full bg-red-600 text-white text-sm font-semibold"
+      >
+        ลบ
+      </button>
+    </form>
+  </div>
+</div>

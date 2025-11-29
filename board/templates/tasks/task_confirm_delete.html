@@ -1,0 +1,28 @@
+{# templates/boards/task_confirm_delete.html #}
+{% extends "base.html" %}
+
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+<div class="fixed inset-0 bg-black/40 flex items-center justify-center z-40">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
+      <h2 class="text-lg font-bold mb-3 text-center">
+          ลบ Task "{{ task.title }}"
+      </h2>
+      <p class="text-sm text-gray-600 mb-5 text-center">
+          ต้องการลบ Task นี้หรือไม่? ข้อมูลจะหายไปถาวร
+      </p>
+      <form method="post" class="flex justify-between">
+          {% csrf_token %}
+          <a href="{% url 'board_detail' task.list.board.id %}"
+             class="px-4 py-2 rounded-full border border-gray-400 text-gray-700 text-sm">
+              ยกเลิก
+          </a>
+          <button type="submit"
+                  class="px-4 py-2 rounded-full bg-red-600 text-white text-sm font-semibold">
+              ลบ
+          </button>
+      </form>
+  </div>
+</div>
+{% endblock %}
