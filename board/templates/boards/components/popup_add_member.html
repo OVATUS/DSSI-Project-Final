@@ -1,0 +1,54 @@
+<div
+  x-cloak
+  x-show="addMemberOpen"
+  x-transition.opacity
+  class="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+>
+  <div
+    @click.outside="addMemberOpen = false"
+    class="bg-white rounded-xl shadow-xl border-[4px] border-[#0094FF] w-full max-w-sm"
+  >
+    <div class="bg-[#0094FF] text-white text-center py-2 rounded-t-lg">
+      <h2 class="font-bold text-lg">เชิญสมาชิกเข้าร่วม</h2>
+    </div>
+
+    <div class="p-6">
+      <p class="text-xs text-gray-500 mb-4 text-center">
+        กรอก Username ของเพื่อนที่คุณต้องการเชิญเข้าบอร์ดนี้
+      </p>
+
+      <form method="post" action="{% url 'add_member' board.id %}" class="space-y-4">
+        {% csrf_token %}
+
+        <div>
+          <label class="block text-sm font-semibold mb-1 text-gray-700">Username</label>
+          <input
+            type="text"
+            name="username"
+            placeholder="เช่น somchai123"
+            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0094FF]"
+            required
+            autocomplete="off"
+          />
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <button
+            type="button"
+            @click="addMemberOpen = false"
+            class="px-4 py-1.5 rounded-full border border-gray-400 text-gray-700 text-sm hover:bg-gray-100"
+          >
+            ยกเลิก
+          </button>
+
+          <button
+            type="submit"
+            class="px-6 py-1.5 rounded-full bg-[#0094FF] text-white text-sm font-semibold hover:bg-[#007acc] shadow-md"
+          >
+            เชิญเลย
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

@@ -27,6 +27,8 @@ function boardDetailPage(config) {
         moveUrl: (config && config.moveUrl) ? config.moveUrl : '',
         listMoveUrl: (config && config.listMoveUrl) ? config.listMoveUrl : '',
 
+        addMemberOpen: false,
+        // ==== Task Modal ====
         taskModalOpen: false,
         taskMode: 'create',
         taskListTitle: '',
@@ -46,6 +48,7 @@ function boardDetailPage(config) {
         listActionUrl: '',
         listDeleteOpen: false,
         listDeleteActionUrl: '',
+
 
         // ==== Task Drag ====
         onDragStartTask(event, taskId) {

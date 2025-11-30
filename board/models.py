@@ -5,12 +5,12 @@ from users.models import User
 class Board(models.Model):
     name = models.CharField(max_length=50)
     description = models.TextField(blank=True, null=True)
-    cover_image = models.ImageField(
-        upload_to="board_covers/",
-        blank=True,
-        null=True
-    )
+    cover_image = models.ImageField(upload_to="board_covers/", blank=True, null=True)
+    
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="boards")
+    
+    members = models.ManyToManyField(User, related_name="joined_boards", blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -10,7 +10,7 @@ urlpatterns = [
     path("<int:board_id>/", board_detail, name="board_detail"),
     path("<int:board_id>/edit/", board_update, name="board_update"),
     path("<int:board_id>/delete/", board_delete, name="board_delete"),
-
+    path("<int:board_id>/add_member/", add_member, name="add_member"),
     # LIST
     path("<int:board_id>/list/create/", list_create, name="list_create"),
     path("list/<int:list_id>/edit/", list_update, name="list_update"),
@@ -21,5 +21,5 @@ urlpatterns = [
     path("task/create/<int:list_id>/", task_create, name="task_create"),
     path("task/<int:task_id>/edit/", task_update, name="task_update"),
     path("task/<int:task_id>/delete/", task_delete, name="task_delete"),
-     path("task/move/", task_move, name="task_move"),
+    path("task/move/", task_move, name="task_move"),
 ]

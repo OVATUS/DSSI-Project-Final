@@ -4,11 +4,12 @@
 {# ซ่อน sidebar ในหน้า board detail เพื่อพื้นที่การทำงานที่กว้างขึ้น #}
 {% block sidebar %}{% endblock %}
 
-{% block content %}
+{% block content %};
 <div
-  x-data="boardDetailPage({
-    moveUrl: '{% url "task_move" %}',
-    listMoveUrl: '{% url "list_reorder" board.id %}'
+ x-data="boardDetailPage({
+    moveUrl: '{% url 'task_move' %}',
+    listMoveUrl: '{% url 'list_reorder' board.id %}',
+    addMemberOpen: false  /* <-- เพิ่มตรงนี้ครับ */
   })"
   class="h-screen flex flex-col bg-linear-to-br from-slate-50 to-slate-200 overflow-hidden"
 >
@@ -45,6 +46,38 @@
         {{ board.name }}
       </h1>
     </div>
+
+    <div class="flex items-center -space-x-2 ml-6 mr-auto">
+  <div class="w-8 h-8 rounded-full border-2 border-white overflow-hidden z-10" title="Owner: {{ board.created_by.username }}">
+    {% if board.created_by.profile_image %}
+      <img src="{{ board.created_by.profile_image.url }}" class="w-full h-full object-cover">
+    {% else %}
+      <div class="w-full h-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">
+        {{ board.created_by.username|slice:":1"|upper }}
+      </div>
+    {% endif %}
+  </div>
+
+  {% for member in board.members.all %}
+    <div class="w-8 h-8 rounded-full border-2 border-white overflow-hidden hover:z-20 transition-all" title="{{ member.username }}">
+      {% if member.profile_image %}
+        <img src="{{ member.profile_image.url }}" class="w-full h-full object-cover">
+      {% else %}
+        <div class="w-full h-full bg-green-500 flex items-center justify-center text-white text-xs font-bold">
+          {{ member.username|slice:":1"|upper }}
+        </div>
+      {% endif %}
+    </div>
+  {% endfor %}
+
+  <button
+    @click="addMemberOpen = true"
+    class="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-600 border-2 border-white flex items-center justify-center text-xs font-bold ml-2 transition z-0"
+    title="Invite Member"
+  >
+    +
+  </button>
+</div>
 
     <div class="flex items-center gap-3">
       <button
@@ -196,6 +229,7 @@
   {% include "boards/components/popup_task_form.html" %}
   {% include "boards/components/popup_list_form.html" %}
   {% include "boards/components/popup_list_delete.html" %}
+  {% include "boards/components/popup_add_member.html" %}
 
 </div>
 {% endblock %}

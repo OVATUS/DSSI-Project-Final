@@ -7,6 +7,7 @@ from users.models import User
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.db.models import Max
+from django.db.models import Q
 
 def board_lsit_view(request):
     return render (request, 'boards/dashboard.html')
@@ -14,17 +15,18 @@ def board_lsit_view(request):
 
 @login_required
 def project_page(request):
-    boards = Board.objects.filter(created_by=request.user).order_by("-created_at")
-    starred_boards = boards.filter(description__icontains="⭐")[:3]
+    boards = Board.objects.filter(
+        Q(created_by=request.user) | Q(members=request.user)
+    ).distinct().order_by("-created_at")
 
-    form = BoardForm()  # ฟอร์มว่างไว้ใช้ใน popup
+    starred_boards = boards.filter(description__icontains="⭐")[:3]
+    form = BoardForm()
 
     return render(request, "boards/project_list.html", {
         "boards": boards,
         "starred_boards": starred_boards,
         "form": form,
     })
-
 
 # CREATE
 from .models import Board, List, Task
@@ -62,16 +64,23 @@ def board_list(request):
 # READ (Detail)
 @login_required
 def board_detail(request, board_id):
-    board = get_object_or_404(Board, id=board_id, created_by=request.user)
-
-    lists = (
-        board.lists
-        .all()
-        .prefetch_related("tasks")
-        .order_by("position")
+    board = get_object_or_404(
+        Board, 
+        Q(created_by=request.user) | Q(members=request.user),
+        id=board_id
     )
 
-    users = User.objects.all()
+    # ... (code ส่วนดึง lists, tasks เหมือนเดิม)
+    lists = board.lists.all().prefetch_related("tasks").order_by("position")
+    
+    # ✅ ส่ง members ทั้งหมดไปที่ template ด้วย (เผื่อใช้แสดงรูปคนในบอร์ด)
+    # เราจะรวมเจ้าของบอร์ด + สมาชิก
+    # (หรือถ้าจะเอาแค่รายชื่อ user ทั้งหมดในระบบเพื่อให้เลือกมอบหมายงาน ก็ใช้ User.objects.all() เหมือนเดิมได้ครับ 
+    # แต่ปกติควรให้เลือก assign ได้เฉพาะคนในบอร์ดนะ)
+    
+    # ตัวอย่าง: เอา User ทั้งหมดในระบบมาแสดงใน Dropdown (แบบเดิมของคุณ)
+    users = User.objects.all() 
+    
     priority_choices = Task.Priority.choices
 
     return render(request, "boards/board_detail.html", {
@@ -252,3 +261,22 @@ def list_reorder(request, board_id):
             l.save(update_fields=["position"])
 
     return JsonResponse({"success": True})
+
+@require_POST
+@login_required
+def add_member(request, board_id):
+    # เฉพาะเจ้าของบอร์ดเท่านั้นที่มีสิทธิ์เชิญคนเพิ่ม (หรือจะให้สมาชิกเชิญด้วยก็ได้ แล้วแต่ตกลง)
+    # ในที่นี้ให้เฉพาะเจ้าของเชิญได้ก่อน
+    board = get_object_or_404(Board, id=board_id, created_by=request.user)
+    
+    username = request.POST.get("username")
+    
+    try:
+        user_to_add = User.objects.get(username=username)
+        # ป้องกันการเชิญตัวเอง หรือเชิญคนที่มีอยู่แล้ว
+        if user_to_add != request.user and user_to_add not in board.members.all():
+            board.members.add(user_to_add)
+    except User.DoesNotExist:
+        pass # หรือจะส่ง message error กลับไปก็ได้
+        
+    return redirect("board_detail", board_id=board.id)
