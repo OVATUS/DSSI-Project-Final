@@ -49,6 +49,59 @@ function boardDetailPage(config) {
         listDeleteOpen: false,
         listDeleteActionUrl: '',
 
+        currentTaskId: null,     // เก็บ ID ของ Task ที่กำลังเปิดอยู่
+        comments: [],            // เก็บรายการคอมเมนต์
+        newCommentText: '',      // ข้อความที่กำลังพิมพ์
+        isLoadingComments: false,
+
+        async loadComments(taskId) {
+            this.currentTaskId = taskId;
+            this.comments = [];
+            this.isLoadingComments = true;
+            
+            try {
+                const res = await fetch(`/board/task/${taskId}/comments/`);
+                const data = await res.json();
+                this.comments = data.comments || [];
+            } catch (err) {
+                console.error("Load comments error:", err);
+            } finally {
+                this.isLoadingComments = false;
+            }
+        },
+
+        // ✅ ฟังก์ชัน: ส่งคอมเมนต์
+        async postComment() {
+            if (!this.newCommentText.trim() || !this.currentTaskId) return;
+
+            const content = this.newCommentText;
+            this.newCommentText = ''; // เคลียร์ช่องพิมพ์ก่อนเพื่อให้ UX ดูลื่น
+
+            const csrftoken = document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1];
+
+            try {
+                const res = await fetch(`/board/task/${this.currentTaskId}/comments/add/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrftoken
+                    },
+                    body: JSON.stringify({ content: content })
+                });
+                
+                if (res.ok) {
+                    const newComment = await res.json();
+                    // แทรกคอมเมนต์ใหม่ไปบนสุด
+                    this.comments.unshift(newComment);
+                } else {
+                    alert('ส่งคอมเมนต์ไม่สำเร็จ');
+                    this.newCommentText = content; // คืนค่าข้อความถ้าส่งไม่ผ่าน
+                }
+            } catch (err) {
+                console.error(err);
+                this.newCommentText = content;
+            }
+        },
 
         // ==== Task Drag ====
         onDragStartTask(event, taskId) {
@@ -63,7 +116,8 @@ function boardDetailPage(config) {
             this.draggingTaskId = null;
             event.dataTransfer.effectAllowed = 'move';
         },
-
+        // ✅ ฟังก์ชัน: โหลดคอมเมนต์
+        
         async onDrop(event, listId) {
             // เคสลาก Task
             if (this.draggingTaskId && this.moveUrl) {

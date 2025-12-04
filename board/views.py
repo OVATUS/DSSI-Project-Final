@@ -8,6 +8,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.db.models import Max
 from django.db.models import Q
+import json
 
 def board_lsit_view(request):
     return render (request, 'boards/dashboard.html')
@@ -280,3 +281,57 @@ def add_member(request, board_id):
         pass # หรือจะส่ง message error กลับไปก็ได้
         
     return redirect("board_detail", board_id=board.id)
+
+
+@login_required
+def get_comments(request, task_id):
+    task = get_object_or_404(Task, id=task_id)
+    
+    # Check สิทธิ์: ต้องเป็นเจ้าของบอร์ด หรือ สมาชิกในบอร์ด
+    if request.user != task.list.board.created_by and request.user not in task.list.board.members.all():
+         return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+    comments = task.comments.select_related('author').order_by('-created_at')
+    
+    data = []
+    for c in comments:
+        # ตรวจสอบรูปโปรไฟล์ (ถ้าไม่มีรูป ให้ส่ง null ไป)
+        avatar_url = c.author.profile_image.url if c.author.profile_image else None
+        
+        data.append({
+            'id': c.id,
+            'author': c.author.username,
+            'author_avatar': avatar_url, 
+            'content': c.content,
+            'created_at': c.created_at.strftime('%d/%m/%Y %H:%M'),
+        })
+    return JsonResponse({'comments': data})
+
+@require_POST
+@login_required
+def add_comment(request, task_id):
+    task = get_object_or_404(Task, id=task_id)
+    
+    # Check สิทธิ์เหมือนเดิม
+    if request.user != task.list.board.created_by and request.user not in task.list.board.members.all():
+         return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+    try:
+        data = json.loads(request.body)
+        content = data.get('content')
+        if not content:
+            return JsonResponse({'error': 'Empty content'}, status=400)
+
+        comment = Comment.objects.create(task=task, author=request.user, content=content)
+        
+        avatar_url = comment.author.profile_image.url if comment.author.profile_image else None
+
+        return JsonResponse({
+            'id': comment.id,
+            'author': comment.author.username,
+            'author_avatar': avatar_url,
+            'content': comment.content,
+            'created_at': comment.created_at.strftime('%d/%m/%Y %H:%M'),
+        })
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)

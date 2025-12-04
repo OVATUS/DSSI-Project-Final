@@ -4,12 +4,12 @@
 {# ซ่อน sidebar ในหน้า board detail เพื่อพื้นที่การทำงานที่กว้างขึ้น #}
 {% block sidebar %}{% endblock %}
 
-{% block content %};
+{% block content %}
 <div
  x-data="boardDetailPage({
     moveUrl: '{% url 'task_move' %}',
     listMoveUrl: '{% url 'list_reorder' board.id %}',
-    addMemberOpen: false  /* <-- เพิ่มตรงนี้ครับ */
+    addMemberOpen: false  
   })"
   class="h-screen flex flex-col bg-linear-to-br from-slate-50 to-slate-200 overflow-hidden"
 >

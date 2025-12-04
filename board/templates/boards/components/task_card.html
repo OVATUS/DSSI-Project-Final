@@ -8,6 +8,7 @@
     taskMode = 'edit';
     taskModalOpen = true;
     taskListTitle = '{{ lst.title|escapejs }}';
+    loadComments({{ task.id }});
     taskActionUrl = '{% url 'task_update' task.id %}';
     taskTitle = '{{ task.title|escapejs }}';
     taskDescription = '{{ task.description|default_if_none:''|escapejs }}';
