@@ -1,7 +1,7 @@
 from django.db import models
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
-from .models import Board, List, Task    
+from .models import Board, List, Task, Comment 
 from .forms import BoardForm, ListForm, TaskForm
 from users.models import User
 from django.http import JsonResponse
@@ -16,9 +16,19 @@ def board_lsit_view(request):
 
 @login_required
 def project_page(request):
+    # 1. ดึง Query พื้นฐานมาก่อน (คนสร้าง หรือ สมาชิก)
     boards = Board.objects.filter(
         Q(created_by=request.user) | Q(members=request.user)
-    ).distinct().order_by("-created_at")
+    ).distinct()
+
+    # ✅ 2. เพิ่มส่วนค้นหา (Search Logic)
+    search_query = request.GET.get('q')  # รับค่าจาก URL เช่น ?q=งานด่วน
+    if search_query:
+        # กรองเฉพาะบอร์ดที่มีชื่อตรงกับคำค้น (icontains = ไม่สนตัวพิมพ์เล็กใหญ่)
+        boards = boards.filter(name__icontains=search_query)
+
+    # 3. สั่งเรียงลำดับ (เหมือนเดิม)
+    boards = boards.order_by("-created_at")
 
     starred_boards = boards.filter(description__icontains="⭐")[:3]
     form = BoardForm()
@@ -27,11 +37,9 @@ def project_page(request):
         "boards": boards,
         "starred_boards": starred_boards,
         "form": form,
+        "search_query": search_query, # ✅ ส่งค่ากลับไปที่ Template ด้วย (เพื่อให้ช่องค้นหาไม่ว่างเปล่าหลังกดค้น)
     })
 
-# CREATE
-from .models import Board, List, Task
-# ...
 
 @login_required
 def board_create(request):
@@ -215,19 +223,51 @@ def task_delete(request, task_id):
         "task": task,
     })
 
+# board/views.py
+
 @require_POST
 @login_required
 def task_move(request):
-    task_id = request.POST.get("task_id")
-    list_id = request.POST.get("list_id")
+    try:
+        # รับ task_id และ list_id เป้าหมาย
+        task_id = request.POST.get("task_id")
+        list_id = request.POST.get("list_id")
+        
+        # ✅ รับ list ของ ID ทั้งหมดในคอลัมน์นั้น (เรียงมาแล้วจาก JS)
+        # ส่งมาเป็น string เช่น "10,5,8" -> แปลงเป็น list [10, 5, 8]
+        order_str = request.POST.get("order", "") 
+        
+        task = get_object_or_404(Task, id=task_id, list__board__created_by=request.user)
+        target_list = get_object_or_404(List, id=list_id, board=task.list.board)
 
-    task = get_object_or_404(Task, id=task_id, list__board__created_by=request.user)
-    target_list = get_object_or_404(List, id=list_id, board=task.list.board)
+        # 1. ย้าย Task ไปลิสต์ใหม่ (ถ้ามีการเปลี่ยนลิสต์)
+        if task.list != target_list:
+            task.list = target_list
+            task.save()
 
-    task.list = target_list
-    task.save()
+        # 2. อัปเดต position ของทุก Task ในลิสต์นั้น
+        if order_str:
+            ordered_ids = [int(id) for id in order_str.split(",") if id]
+            
+            # ดึง tasks ทั้งหมดในลิสต์เป้าหมายมา
+            tasks_in_list = Task.objects.filter(list=target_list, id__in=ordered_ids)
+            
+            # สร้าง dict เพื่อให้เข้าถึงง่าย {task_id: task_obj}
+            task_map = {t.id: t for t in tasks_in_list}
+            
+            # วนลูปเซฟ position ตามลำดับที่ส่งมา
+            for index, t_id in enumerate(ordered_ids, start=1):
+                if t_id in task_map:
+                    t = task_map[t_id]
+                    # เซฟเฉพาะถ้าค่าเปลี่ยน (ลด query)
+                    if t.position != index:
+                        t.position = index
+                        t.save(update_fields=['position'])
 
-    return JsonResponse({"success": True})
+        return JsonResponse({"success": True})
+        
+    except Exception as e:
+        return JsonResponse({"success": False, "error": str(e)}, status=500)
 
 @require_POST
 @login_required

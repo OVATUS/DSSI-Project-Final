@@ -3,16 +3,23 @@
 {% block content %}
 <div x-data="projectPage()" class="relative p-4">
 
-  <!-- 🔍 Search Bar -->
   <div class="flex justify-center mt-4">
-    <div class="w-full max-w-2xl relative">
+    <form method="get" action="{% url 'project_page' %}" class="w-full max-w-2xl relative">
+      
       <input
         type="text"
-        placeholder="ค้นหางานของคุณ"
-        class="w-full py-2 pl-10 pr-4 rounded-full bg-gray-200 outline-none focus:ring-2 focus:ring-blue-400"
+        name="q" 
+        value="{{ search_query|default_if_none:'' }}" 
+        placeholder="ค้นหาชื่อโปรเจกต์..."
+        class="w-full py-2 pl-10 pr-4 rounded-full bg-gray-200 outline-none focus:ring-2 focus:ring-blue-400 transition-all"
+        autocomplete="off"
       />
-      <span class="absolute left-3 top-2.5 text-gray-500 text-xl"> 🔍 </span>
-    </div>
+      
+      <button type="submit" class="absolute left-3 top-2.5 text-gray-500 hover:text-blue-600 cursor-pointer bg-transparent border-none p-0">
+         🔍 
+      </button>
+
+    </form>
   </div>
 
   <!-- Favorite Projects -->

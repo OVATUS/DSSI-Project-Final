@@ -165,7 +165,13 @@
           {# CARD AREA (Scrollable vertical if many tasks) #}
           <div class="flex-1 overflow-y-auto px-2 pb-2 space-y-2 min-h-[50px] custom-scrollbar">
             {% for task in lst.tasks.all %}
-              <div class="transform transition hover:-translate-y-1 duration-200">
+              <div 
+                class="transform transition hover:-translate-y-1 duration-200"
+                draggable="true"
+                data-task-id="{{ task.id }}"
+                @dragstart="onDragStartTask($event, {{ task.id }})"
+                @dragend="onDragEndTask($event)"
+              >
                   {% include "boards/components/task_card.html" with task=task lst=lst %}
               </div>
             {% empty %}

@@ -6,11 +6,8 @@ class Board(models.Model):
     name = models.CharField(max_length=50)
     description = models.TextField(blank=True, null=True)
     cover_image = models.ImageField(upload_to="board_covers/", blank=True, null=True)
-    
-    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="boards")
-    
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="boards")  
     members = models.ManyToManyField(User, related_name="joined_boards", blank=True)
-
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -41,6 +38,7 @@ class Task(models.Model):
     list = models.ForeignKey(List, on_delete=models.CASCADE, related_name="tasks")  # list_id
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
+    position = models.IntegerField(default=0)
 
     # ผู้รับผิดชอบงาน (nullable)
     assigned_to = models.ForeignKey(
@@ -66,7 +64,9 @@ class Task(models.Model):
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
-
+    
+    class Meta:
+        ordering = ['position']
     def __str__(self):
         return f"{self.title} ({self.get_status_display()})"
 
