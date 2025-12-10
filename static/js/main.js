@@ -31,7 +31,7 @@ function projectPage() {
     };
 }
 
-function boardDetailPage(config) {
+window.boardDetailPage = function (config) {
     return {
         // ==== Configuration ====
         moveUrl: (config && config.moveUrl) ? config.moveUrl : '',
@@ -52,7 +52,7 @@ function boardDetailPage(config) {
         taskPriority: 'medium',
 
         // ==== List Modal ====
-        listModalOpen: false,
+       listModalOpen: false,
         listModalMode: 'create',
         listTitle: '',
         listActionUrl: '',
