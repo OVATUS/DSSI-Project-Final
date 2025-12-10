@@ -92,9 +92,9 @@ function boardDetailPage(config) {
             if (!this.newCommentText.trim() || !this.currentTaskId) return;
 
             const content = this.newCommentText;
-            this.newCommentText = ''; // เคลียร์ช่องพิมพ์ทันที UX จะดูลื่นขึ้น
+            this.newCommentText = ''; 
 
-            const csrftoken = getCookie('csrftoken'); // ใช้ฟังก์ชันใหม่
+            const csrftoken = getCookie('csrftoken');
 
             try {
                 const res = await fetch(`/board/task/${this.currentTaskId}/comments/add/`, {
@@ -108,10 +108,10 @@ function boardDetailPage(config) {
                 
                 if (res.ok) {
                     const newComment = await res.json();
-                    this.comments.unshift(newComment); // แทรกบนสุด
+                    this.comments.unshift(newComment); 
                 } else {
                     alert('ส่งคอมเมนต์ไม่สำเร็จ');
-                    this.newCommentText = content; // คืนค่าถ้าส่งพลาด
+                    this.newCommentText = content; 
                 }
             } catch (err) {
                 console.error(err);
@@ -120,7 +120,7 @@ function boardDetailPage(config) {
         },
 
         // ------------------------------------------------------------------
-        // ✅ Section 2: Drag & Drop Logic (Task Reordering)
+        // ✅ Section 2: Drag & Drop Logic
         // ------------------------------------------------------------------
 
         // 1. เริ่มลาก Task
@@ -129,12 +129,10 @@ function boardDetailPage(config) {
             this.draggingListId = null;
             event.dataTransfer.effectAllowed = 'move';
             event.dataTransfer.dropEffect = 'move';
-            
-            // เพิ่ม class เพื่อให้รู้ว่าตัวไหนกำลังถูกลาก (Visual)
             event.target.classList.add('opacity-50', 'dragging');
         },
 
-        // 2. ลากเสร็จ (ไม่ว่าจะวางได้หรือไม่)
+        // 2. ลากเสร็จ
         onDragEndTask(event) {
             event.target.classList.remove('opacity-50', 'dragging');
             this.draggingTaskId = null;
@@ -147,27 +145,22 @@ function boardDetailPage(config) {
             event.dataTransfer.effectAllowed = 'move';
         },
 
-        // 4. ขณะลากผ่านลิสต์ (หัวใจสำคัญ: คำนวณตำแหน่ง Real-time)
+        // 4. ✅ (ส่วนที่เคยหายไป) ขณะลากผ่านลิสต์
         onDragOver(event) {
-            // ถ้ากำลังลาก List อยู่ ไม่ต้องทำ logic แทรกการ์ด
             if (this.draggingListId) {
                 event.preventDefault();
                 return;
             }
 
-            // ถ้ากำลังลาก Task
             if (this.draggingTaskId) {
-                event.preventDefault(); // อนุญาตให้ Drop ได้
-
-                const container = event.currentTarget; // div.task-container
+                event.preventDefault();
+                const container = event.currentTarget;
                 const draggingEl = document.querySelector('.dragging');
 
                 if (!draggingEl) return;
 
-                // คำนวณตำแหน่งที่จะแทรก
                 const afterElement = this.getDragAfterElement(container, event.clientY);
                 
-                // ย้าย DOM จริงๆ ไปวางตรงนั้นเลย
                 if (afterElement == null) {
                     container.appendChild(draggingEl);
                 } else {
@@ -176,16 +169,14 @@ function boardDetailPage(config) {
             }
         },
 
-        // 5. Helper: หา Element ที่อยู่ถัดไปจากตำแหน่งเมาส์
+        // 5. ✅ (ส่วนที่เคยหายไป) Helper คำนวณตำแหน่ง
         getDragAfterElement(container, y) {
-            // เอาการ์ดทุกใบในลิสต์ ยกเว้นใบที่เรากำลังลาก
             const draggableElements = [...container.querySelectorAll('[draggable="true"]:not(.dragging)')];
 
             return draggableElements.reduce((closest, child) => {
                 const box = child.getBoundingClientRect();
                 const offset = y - box.top - box.height / 2;
                 
-                // ถ้า offset เป็นลบ (อยู่เหนือ) และใกล้ที่สุดเท่าที่หาเจอ
                 if (offset < 0 && offset > closest.offset) {
                     return { offset: offset, element: child };
                 } else {
@@ -194,28 +185,25 @@ function boardDetailPage(config) {
             }, { offset: Number.NEGATIVE_INFINITY }).element;
         },
 
-        // 6. วาง (Save ลง Database)
+        // 6. วาง (Drop)
         async onDrop(event, listId) {
             const csrftoken = getCookie('csrftoken');
 
-            // --- CASE A: วาง Task (บันทึกลำดับใหม่) ---
+            // --- CASE A: วาง Task ---
             if (this.draggingTaskId && this.moveUrl) {
                 event.preventDefault();
-
                 const container = event.currentTarget;
                 
-                // 1. กวาด ID ทั้งหมดในลิสต์นี้มาเรียงต่อกัน
                 const taskElements = container.querySelectorAll('[data-task-id]');
                 let orderedIds = [];
                 taskElements.forEach(el => {
                     orderedIds.push(el.dataset.taskId);
                 });
 
-                // 2. ส่งข้อมูลไป Backend
                 const formData = new FormData();
                 formData.append('task_id', this.draggingTaskId);
                 formData.append('list_id', listId);
-                formData.append('order', orderedIds.join(',')); // เช่น "10,5,8"
+                formData.append('order', orderedIds.join(','));
 
                 try {
                     const res = await fetch(this.moveUrl, {
@@ -226,9 +214,8 @@ function boardDetailPage(config) {
                     
                     if (!res.ok) {
                         console.error('Task move failed');
-                        window.location.reload(); // ถ้าพัง ให้รีโหลดเพื่อคืนค่า
+                        window.location.reload();
                     }
-                    // ถ้าสำเร็จ ไม่ต้อง reload เพราะหน้าขยับไปแล้ว
                 } catch (err) {
                     console.error(err);
                 }
@@ -237,7 +224,7 @@ function boardDetailPage(config) {
                 return;
             }
 
-            // --- CASE B: วาง List (สลับคอลัมน์) ---
+            // --- CASE B: วาง List ---
             if (this.draggingListId && this.listMoveUrl) {
                 const fromId = this.draggingListId;
                 this.draggingListId = null;
@@ -252,7 +239,7 @@ function boardDetailPage(config) {
                         headers: { 'X-CSRFToken': csrftoken },
                         body: formData,
                     });
-                    window.location.reload(); // ลิสต์สลับต้องรีโหลดเพื่อให้แสดงผลถูกต้อง
+                    window.location.reload();
                 } catch (err) {
                     console.error(err);
                 }

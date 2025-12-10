@@ -2,8 +2,6 @@
 {# ต้องถูก include ด้วย with task=task lst=lst #}
 <div
   class="bg-white rounded-full px-3 py-1 text-xs shadow cursor-pointer hover:bg-gray-50 grid grid-cols-2 justify-between items-center"
-  draggable="true"
-  @dragstart="onDragStartTask($event, {{ task.id }})"
   @click="
    taskMode = 'edit';
     taskModalOpen = true;

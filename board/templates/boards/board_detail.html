@@ -8,8 +8,7 @@
 <div
  x-data="boardDetailPage({
     moveUrl: '{% url 'task_move' %}',
-    listMoveUrl: '{% url 'list_reorder' board.id %}',
-    addMemberOpen: false  
+    listMoveUrl: '{% url 'list_reorder' board.id %}'
   })"
   class="h-screen flex flex-col bg-linear-to-br from-slate-50 to-slate-200 overflow-hidden"
 >
@@ -126,7 +125,7 @@
               {{ lst.title }}
             </h2>
             
-            <div class="relative x-data="{ openMenu: false }>
+            <div class="relative" x-data="{ openMenu: false }">
                 <button class="text-gray-400 hover:text-gray-700 p-1 rounded hover:bg-gray-200 transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                         <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
@@ -163,7 +162,11 @@
           </div>
 
           {# CARD AREA (Scrollable vertical if many tasks) #}
-          <div class="flex-1 overflow-y-auto px-2 pb-2 space-y-2 min-h-[50px] custom-scrollbar">
+          <div 
+            class="flex-1 overflow-y-auto px-2 pb-2 space-y-2 min-h-[50px] custom-scrollbar task-container"
+            @dragover="onDragOver($event)" 
+            @drop="onDrop($event, {{ lst.id }})"
+          >
             {% for task in lst.tasks.all %}
               <div 
                 class="transform transition hover:-translate-y-1 duration-200"
