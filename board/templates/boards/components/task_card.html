@@ -1,5 +1,4 @@
 {# templates/boards/components/task_card.html #}
-{# ต้องถูก include ด้วย with task=task lst=lst #}
 <div
   class="bg-white rounded-full px-3 py-1 text-xs shadow cursor-pointer hover:bg-gray-50 grid grid-cols-2 justify-between items-center"
   @click="
@@ -15,13 +14,66 @@
     taskDueDate = '{{ task.due_date|default_if_none:''|date:'Y-m-d\\TH:i' }}';
   "
 >
-  <span class="truncate text-[12px] max-w-[150px] max-h-10">
-    {{ task.title }}
-  </span>
-  <span class="text-[12px] text-gray-500 max-h-10">
-    {{ task.get_priority_display }}
-  </span>
-  <span class="truncate text-[12px] max-w-[150px] max-h-10">
-    คนที่รับผิดชอบ {{ task.assigned_to_id }}
-  </span>
+  {# ⭐ 1. ส่วนแสดงป้ายกำกับ (Labels) ⭐ #}
+    {% if task.labels.all %}
+    <div class="flex flex-wrap gap-1 mb-1">
+        {% for label in task.labels.all %}
+            <div 
+                class="h-1.5 w-8 rounded-full {{ label.color }}" 
+                title="{{ label.name }}"
+            ></div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {# 2. ชื่อการ์ด #}
+    <div class="flex justify-between items-start">
+        <h3 class="font-medium text-gray-800 text-sm leading-snug break-words">
+            {{ task.title }}
+        </h3>
+        
+        {# ปุ่มแก้ไขเล็กๆ (โผล่เมื่อเอาเมาส์ชี้) #}
+        <button class="text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity p-1">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+            </svg>
+        </button>
+    </div>
+    
+    {# 3. รายละเอียดอื่นๆ (สมาชิก, วันกำหนดส่ง, คอมเมนต์) #}
+    <div class="flex items-center gap-2 mt-1 text-xs text-gray-400">
+        
+        {# วันกำหนดส่ง #}
+        {% if task.due_date %}
+            <div class="flex items-center gap-1 {{ task.is_overdue|yesno:'text-red-500,text-gray-400' }}" title="กำหนดส่ง: {{ task.due_date }}">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>{{ task.due_date|date:"d M" }}</span>
+            </div>
+        {% endif %}
+
+        {# จำนวนคอมเมนต์ #}
+        {% if task.comments.exists %}
+             <div class="flex items-center gap-0.5" title="{{ task.comments.count }} ความคิดเห็น">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                <span>{{ task.comments.count }}</span>
+             </div>
+        {% endif %}
+
+        {# ผู้รับผิดชอบ (ชิดขวาสุด) #}
+        {% if task.assigned_to %}
+            <div class="ml-auto">
+                {% if task.assigned_to.profile_image %}
+                    <img src="{{ task.assigned_to.profile_image.url }}" class="w-5 h-5 rounded-full object-cover border border-white shadow-sm" title="{{ task.assigned_to.username }}">
+                {% else %}
+                    <div class="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-[10px] font-bold border border-white shadow-sm" title="{{ task.assigned_to.username }}">
+                        {{ task.assigned_to.username.0|upper }}
+                    </div>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
 </div>

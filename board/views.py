@@ -1,7 +1,7 @@
 from django.db import models
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
-from .models import Board, List, Task, Comment 
+from .models import Board, List, Task, Comment , Label
 from .forms import BoardForm, ListForm, TaskForm
 from users.models import User
 from django.http import JsonResponse
@@ -13,6 +13,23 @@ import json
 def board_lsit_view(request):
     return render (request, 'boards/dashboard.html')
 
+@login_required
+@require_POST
+def toggle_star_board(request, board_id):
+    board = get_object_or_404(Board, id=board_id)
+    
+    # ตรวจสอบสิทธิ์ (ต้องเป็นสมาชิกบอร์ดถึงจะติดดาวได้)
+    if request.user not in board.members.all() and board.created_by != request.user:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+
+    if request.user in board.starred_by.all():
+        board.starred_by.remove(request.user)
+        is_starred = False
+    else:
+        board.starred_by.add(request.user)
+        is_starred = True
+
+    return JsonResponse({'is_starred': is_starred})
 
 @login_required
 def project_page(request):
@@ -21,8 +38,7 @@ def project_page(request):
         Q(created_by=request.user) | Q(members=request.user)
     ).distinct()
 
-    # ✅ 2. เพิ่มส่วนค้นหา (Search Logic)
-    search_query = request.GET.get('q')  # รับค่าจาก URL เช่น ?q=งานด่วน
+    search_query = request.GET.get('q')  
     if search_query:
         # กรองเฉพาะบอร์ดที่มีชื่อตรงกับคำค้น (icontains = ไม่สนตัวพิมพ์เล็กใหญ่)
         boards = boards.filter(name__icontains=search_query)
@@ -30,14 +46,14 @@ def project_page(request):
     # 3. สั่งเรียงลำดับ (เหมือนเดิม)
     boards = boards.order_by("-created_at")
 
-    starred_boards = boards.filter(description__icontains="⭐")[:3]
+    starred_boards = boards.filter(starred_by=request.user)
     form = BoardForm()
 
     return render(request, "boards/project_list.html", {
         "boards": boards,
         "starred_boards": starred_boards,
         "form": form,
-        "search_query": search_query, # ✅ ส่งค่ากลับไปที่ Template ด้วย (เพื่อให้ช่องค้นหาไม่ว่างเปล่าหลังกดค้น)
+        "search_query": search_query, 
     })
 
 
@@ -97,6 +113,7 @@ def board_detail(request, board_id):
         "lists": lists,
         "users": users,
         "priority_choices": priority_choices,
+        "labels": board.labels.all(),
     })
 
 # UPDATE
@@ -182,6 +199,9 @@ def task_create(request, list_id):
             task = form.save(commit=False)
             task.list = list_obj
             task.save()
+            label_ids = request.POST.getlist('labels') # รับค่าจากฟอร์ม (list ของ id)
+            if label_ids:
+                task.labels.set(label_ids) # บันทึกความสัมพันธ์ Many-to-Many
             return redirect("board_detail", board_id=list_obj.board.id)
     else:
         form = TaskForm()
@@ -375,3 +395,32 @@ def add_comment(request, task_id):
         })
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+@login_required
+@require_POST
+def create_label(request, board_id):
+    board = get_object_or_404(Board, id=board_id)
+    
+    # ตรวจสอบสิทธิ์ว่า user เป็นสมาชิกบอร์ดไหม
+    if request.user not in board.members.all() and board.created_by != request.user:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+
+    try:
+        data = json.loads(request.body)
+        name = data.get('name')
+        color = data.get('color')
+
+        if not name or not color:
+             return JsonResponse({'error': 'Missing data'}, status=400)
+
+        # สร้าง Label ใหม่
+        label = Label.objects.create(board=board, name=name, color=color)
+
+        return JsonResponse({
+            'success': True,
+            'id': label.id,
+            'name': label.name,
+            'color': label.color
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

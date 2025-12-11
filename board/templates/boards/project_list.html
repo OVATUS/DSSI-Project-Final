@@ -1,11 +1,12 @@
+{# board/templates/boards/project_list.html #}
 {% extends "base.html" %}
 
 {% block content %}
 <div x-data="projectPage()" class="relative p-4">
 
+  {# --- SEARCH BAR --- #}
   <div class="flex justify-center mt-4">
     <form method="get" action="{% url 'project_page' %}" class="w-full max-w-2xl relative">
-      
       <input
         type="text"
         name="q" 
@@ -14,60 +15,67 @@
         class="w-full py-2 pl-10 pr-4 rounded-full bg-gray-200 outline-none focus:ring-2 focus:ring-blue-400 transition-all"
         autocomplete="off"
       />
-      
       <button type="submit" class="absolute left-3 top-2.5 text-gray-500 hover:text-blue-600 cursor-pointer bg-transparent border-none p-0">
-         🔍 
+          🔍 
       </button>
-
     </form>
   </div>
 
-  <!-- Favorite Projects -->
+  {# --- SECTION 1: Favorite Projects (Project ที่ติดดาว) --- #}
   <div class="mt-8">
-    <h2 class="text-lg font-semibold">Project ที่ติดดาว ⭐</h2>
-    <hr class="border-gray-400 mt-2" />
+    <h2 class="text-lg font-semibold flex items-center gap-2 text-yellow-600">
+        <span>Project ที่ติดดาว</span>
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 fill-current" viewBox="0 0 20 20">
+            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+        </svg>
+    </h2>
+    <hr class="border-gray-300 mt-2 mb-4" />
 
     {% if starred_boards %}
-      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-4">
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
         {% for board in starred_boards %}
-          <div
-            class="bg-blue-600 text-white rounded-md p-3 cursor-pointer hover:opacity-90 transition"
-          >
-            <h3 class="font-bold text-sm">{{ board.name }}</h3>
-            <p class="text-xs opacity-80 mt-1">
-              {{ board.description|default:"ไม่มีคำอธิบาย" }}
-            </p>
-          </div>
+          {# ✅ ใช้ Component เดียวกัน เพื่อให้มีปุ่มดาวและดีไซน์เหมือนกัน #}
+          {% include "boards/components/board_card.html" with board=board %}
         {% endfor %}
       </div>
     {% else %}
-      <p class="text-sm text-gray-500 mt-3">ไม่มีโปรเจกต์ที่ติดดาว</p>
+      <div class="text-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+          <p class="text-sm text-gray-500">คุณยังไม่มีโปรเจกต์ที่ติดดาว</p>
+          <p class="text-xs text-gray-400 mt-1">กดที่รูปดาวบนการ์ดเพื่อเพิ่มรายการโปรดที่นี่</p>
+      </div>
     {% endif %}
   </div>
 
-  <!-- My Project -->
+  {# --- SECTION 2: My Projects (โปรเจกต์ทั้งหมด) --- #}
   <div class="mt-10">
-    <h2 class="text-lg font-semibold">My Project</h2>
-    <hr class="border-gray-400 mt-2" />
+    <h2 class="text-lg font-semibold text-gray-700">My Project</h2>
+    <hr class="border-gray-300 mt-2 mb-4" />
 
-    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-6">
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      
+      {# วนลูปแสดงบอร์ดทั้งหมด #}
       {% for board in boards %}
         {% include "boards/components/board_card.html" with board=board %}
       {% endfor %}
 
-      <!-- การ์ดสร้างโปรเจกต์ -->
+      {# การ์ดปุ่มสร้างโปรเจกต์ (อยู่ท้ายสุด) #}
       <button
         type="button"
         @click="openCreate = true"
-        class="flex flex-col items-center justify-center bg-gray-200 border border-gray-400 rounded-md h-32 hover:bg-gray-300 transition w-full"
+        class="flex flex-col items-center justify-center bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg h-full min-h-[180px] hover:bg-white hover:border-indigo-400 hover:text-indigo-600 text-gray-500 transition-all duration-200 group"
       >
-        <div class="text-3xl font-bold text-gray-700">+</div>
-        <div class="text-gray-700 text-sm mt-1">สร้างบอร์ดงาน</div>
+        <div class="w-12 h-12 rounded-full bg-gray-200 group-hover:bg-indigo-100 flex items-center justify-center mb-2 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+        </div>
+        <span class="font-medium text-sm">สร้างบอร์ดใหม่</span>
       </button>
+
     </div>
   </div>
 
-  {# popup ต่าง ๆ ถูกแยกออก #}
+  {# --- POPUPS --- #}
   {% include "boards/components/popup_create_board.html" %}
   {% include "boards/components/popup_edit_board.html" %}
   {% include "boards/components/popup_delete_board.html" %}

@@ -1,72 +1,112 @@
-{# การ์ดบอร์ด 1 ใบ + เมนู ⋯ #}
-<div class="relative">
-  <!-- ปุ่มจุด 3 จุด -->
-  <button
-    type="button"
-    @click.stop="menuBoardId === {{ board.id }} ? menuBoardId = null : menuBoardId = {{ board.id }}"
-    class="absolute right-2 top-2 z-10 w-8 h-8 rounded-full bg-black/40 text-white flex items-center justify-center hover:bg-black/60"
-  >
-    ⋯
-  </button>
+{# templates/boards/components/board_card.html #}
 
-  <!-- เมนู แก้ไข / ลบ -->
-  <div
-    x-show="menuBoardId === {{ board.id }}"
-    x-transition
-    @click.outside="menuBoardId = null"
-    class="absolute right-2 top-10 z-20 bg-white rounded-md shadow-lg border border-gray-200 w-36 text-sm"
-  >
-    <!-- แก้ไข = เปิด popup edit -->
-    <button
-      type="button"
-      class="block w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-800"
-      @click.prevent="
-        menuBoardId = null;
-        openEdit = true;
-        editActionUrl = '{% url 'board_update' board.id %}';
-        editName = '{{ board.name|escapejs }}';
-        editDescription = '{{ board.description|default_if_none:''|escapejs }}';
-        editCoverPreview = '{{ board.cover_image.url|default_if_none:'' }}';
-      "
-    >
-      แก้ไข
-    </button>
+<div 
+  class="relative group bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden border border-gray-200 flex flex-col h-full"
+  {# 1. ตรวจสอบว่า User ปัจจุบันติดดาวบอร์ดนี้หรือยัง #}
+  x-data="{ starred: {% if request.user in board.starred_by.all %}true{% else %}false{% endif %} }"
+>
+  
+  {# --- ส่วนรูปปก (Cover Image) --- #}
+  <a href="{% url 'board_detail' board.id %}" class="block h-32 bg-gray-200 relative shrink-0">
+     {% if board.cover_image %}
+       <img src="{{ board.cover_image.url }}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
+     {% else %}
+       {# Fallback: ถ้าไม่มีรูป ให้โชว์สีพื้นหลัง #}
+       <div class="w-full h-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
+          <span class="text-4xl opacity-20">🗂️</span>
+       </div>
+     {% endif %}
 
-    <!-- ลบ = เปิด popup ลบ -->
-    <button
-      type="button"
-      class="block w-full text-left px-3 py-2 hover:bg-red-50 text-red-600"
-      @click.prevent="
-        menuBoardId = null;
-        openDelete = true;
-        deleteUrl = '{% url 'board_delete' board.id %}';
-      "
-    >
-      ลบ
-    </button>
-  </div>
+     {# ⭐ 2. ปุ่มดาว (Overlay มุมขวาบน) ⭐ #}
+     <button 
+        type="button"
+        @click.prevent="
+            fetch('{% url 'board_star' board.id %}', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+            })
+            .then(res => res.json())
+            .then(data => { 
+                starred = data.is_starred; 
+                {# ถ้าอยากให้รีโหลดหน้าจอทันทีที่กด (เพื่อให้รายการโปรดย้ายที่) ให้ uncomment บรรทัดล่าง #}
+                {# if (!starred) window.location.reload(); #}
+            })
+        "
+        class="absolute top-2 right-2 p-1.5 rounded-full shadow-sm transition-all duration-200 z-10 transform scale-90 hover:scale-110"
+        :class="starred ? 'bg-yellow-100 text-yellow-500 hover:bg-yellow-200' : 'bg-white/80 text-gray-400 hover:bg-white hover:text-yellow-400'"
+        title="ติดดาว / ยกเลิกดาว"
+     >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" :fill="starred ? 'currentColor' : 'none'" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+        </svg>
+     </button>
+  </a>
 
-  <!-- การ์ดโปรเจกต์ -->
-  <div
-    class="w-full bg-gray-800 rounded-md overflow-hidden shadow cursor-pointer hover:scale-105 transition"
-    @click="window.location='{% url 'board_detail' board.id %}'"
-  >
-    {% if board.cover_image %}
-      <img
-        src="{{ board.cover_image.url }}"
-        alt="{{ board.name }}"
-        class="w-full h-28 object-cover"
-      />
-    {% else %}
-      <img
-        src="https://source.unsplash.com/random/300x200/?project"
-        alt=""
-        class="w-full h-28 object-cover"
-      />
-    {% endif %}
+  {# --- ส่วนเนื้อหาการ์ด --- #}
+  <div class="p-4 flex-1 flex flex-col">
+    <a href="{% url 'board_detail' board.id %}" class="block group-hover:text-indigo-600 transition-colors">
+        <h3 class="font-bold text-gray-800 truncate text-base mb-1">{{ board.name }}</h3>
+    </a>
+    
+    <p class="text-xs text-gray-500 line-clamp-2 min-h-[2.5em] mb-4">
+        {{ board.description|default:"ไม่มีรายละเอียดเพิ่มเติม" }}
+    </p>
+    
+    {# Footer ของการ์ด (สมาชิก + ปุ่มแก้ไข) #}
+    <div class="mt-auto pt-3 border-t border-gray-100 flex justify-between items-center">
+        <span class="text-[10px] text-gray-400">
+           {{ board.members.count }} สมาชิก
+        </span>
 
-    <div class="p-2 bg-gray-900 text-white text-sm font-semibold">
-      {{ board.name }}
+        {# ปุ่มจุดสามจุด (แก้ไข/ลบ) #}
+        <div class="relative" x-data="{ openMenu: false }">
+            <button 
+                @click.prevent="openMenu = !openMenu" 
+                @click.outside="openMenu = false"
+                class="text-gray-400 hover:text-gray-600 p-1 rounded-md hover:bg-gray-100 transition-colors"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                </svg>
+            </button>
+
+            {# Dropdown Menu #}
+            <div 
+                x-show="openMenu" 
+                x-cloak
+                x-transition
+                class="absolute right-0 bottom-full mb-1 w-32 bg-white rounded-lg shadow-xl border border-gray-100 z-20 overflow-hidden"
+            >
+                <button 
+                    type="button"
+                    class="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                    @click.prevent="
+                        menuBoardId = null;
+                        openEdit = true;
+                        editActionUrl = '{% url 'board_update' board.id %}';
+                        editName = '{{ board.name|escapejs }}';
+                        editDescription = '{{ board.description|default_if_none:""|escapejs }}';
+                        editCoverPreview = '{% if board.cover_image %}{{ board.cover_image.url }}{% endif %}';
+                        openMenu = false;
+                    "
+                >
+                    ✏️ แก้ไข
+                </button>
+                
+                <button 
+                    type="button"
+                    class="w-full text-left px-4 py-2 text-xs text-red-600 hover:bg-red-50 flex items-center gap-2"
+                    @click.prevent="
+                        menuBoardId = {{ board.id }};
+                        deleteUrl = '{% url 'board_delete' board.id %}'; 
+                        openDelete = true;
+                        openMenu = false;
+                    "
+                >
+                    🗑️ ลบ
+                </button>
+            </div>
+        </div>
     </div>
   </div>
 </div>

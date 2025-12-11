@@ -8,7 +8,7 @@
 <div
   x-data="boardDetailPage({
     moveUrl: '{% url 'task_move' %}',
-    listMoveUrl: '{% url 'list_reorder' board.id %}'
+    listMoveUrl: '{% url 'list_reorder' board.id %}',
   })"
   class="h-screen flex flex-col bg-linear-to-br from-slate-50 to-slate-200 overflow-hidden"
 >
@@ -35,6 +35,8 @@
 
   {# --- HEADER / TOOLBAR --- #}
   <header class="h-16 shrink-0 bg-white/80 backdrop-blur-md border-b border-gray-200 flex items-center justify-between px-6 shadow-sm z-10">
+    
+    {# ฝั่งซ้าย: Icon + ชื่อบอร์ด #}
     <div class="flex items-center gap-4">
       <div class="bg-indigo-600 text-white p-2 rounded-lg shadow-sm">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -46,39 +48,64 @@
       </h1>
     </div>
 
+    {# ตรงกลาง: รายชื่อสมาชิก (Members) #}
     <div class="flex items-center -space-x-2 ml-6 mr-auto">
-  <div class="w-8 h-8 rounded-full border-2 border-white overflow-hidden z-10" title="Owner: {{ board.created_by.username }}">
-    {% if board.created_by.profile_image %}
-      <img src="{{ board.created_by.profile_image.url }}" class="w-full h-full object-cover">
-    {% else %}
-      <div class="w-full h-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">
-        {{ board.created_by.username|slice:":1"|upper }}
+      <div class="w-8 h-8 rounded-full border-2 border-white overflow-hidden z-10" title="Owner: {{ board.created_by.username }}">
+        {% if board.created_by.profile_image %}
+          <img src="{{ board.created_by.profile_image.url }}" class="w-full h-full object-cover">
+        {% else %}
+          <div class="w-full h-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">
+            {{ board.created_by.username|slice:":1"|upper }}
+          </div>
+        {% endif %}
       </div>
-    {% endif %}
-  </div>
 
-  {% for member in board.members.all %}
-    <div class="w-8 h-8 rounded-full border-2 border-white overflow-hidden hover:z-20 transition-all" title="{{ member.username }}">
-      {% if member.profile_image %}
-        <img src="{{ member.profile_image.url }}" class="w-full h-full object-cover">
-      {% else %}
-        <div class="w-full h-full bg-green-500 flex items-center justify-center text-white text-xs font-bold">
-          {{ member.username|slice:":1"|upper }}
+      {% for member in board.members.all %}
+        <div class="w-8 h-8 rounded-full border-2 border-white overflow-hidden hover:z-20 transition-all" title="{{ member.username }}">
+          {% if member.profile_image %}
+            <img src="{{ member.profile_image.url }}" class="w-full h-full object-cover">
+          {% else %}
+            <div class="w-full h-full bg-green-500 flex items-center justify-center text-white text-xs font-bold">
+              {{ member.username|slice:":1"|upper }}
+            </div>
+          {% endif %}
         </div>
-      {% endif %}
+      {% endfor %}
+
+      <button
+        @click="addMemberOpen = true"
+        class="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-600 border-2 border-white flex items-center justify-center text-xs font-bold ml-2 transition relative z-10"
+        title="Invite Member"
+      >
+        +
+      </button>
     </div>
-  {% endfor %}
 
-  <button
-    @click="addMemberOpen = true"
-    class="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-600 border-2 border-white flex items-center justify-center text-xs font-bold ml-2 transition relative z-10"
-    title="Invite Member"
-  >
-    +
-  </button>
-</div>
-
+    {# ฝั่งขวา: ปุ่ม Action ต่างๆ (เพิ่มลิสต์, เมนู) #}
     <div class="flex items-center gap-3">
+      
+      {# ⭐ 1. ปุ่มดาว #}
+      <button
+        type="button"
+        x-data="{ starred: {% if request.user in board.starred_by.all %}true{% else %}false{% endif %} }"
+        @click="
+            fetch('{% url 'board_star' board.id %}', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+            })
+            .then(res => res.json())
+            .then(data => { starred = data.is_starred; })
+        "
+        class="p-2 rounded-full transition-colors border border-transparent hover:bg-gray-100"
+        :class="starred ? 'text-yellow-400' : 'text-gray-400 hover:text-yellow-400'"
+        title="ติดดาวบอร์ดนี้"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" :fill="starred ? 'currentColor' : 'none'" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+        </svg>
+      </button>
+
+      {# 2. ปุ่มเพิ่มลิสต์ใหม่ #}
       <button
         type="button"
         class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white transition-colors rounded-md px-4 py-2 text-sm font-medium shadow-sm"
@@ -95,6 +122,7 @@
         <span>เพิ่มลิสต์ใหม่</span>
       </button>
       
+      {# 3. ปุ่มเมนู (จุดสามจุด) #}
       <button class="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
@@ -133,7 +161,7 @@
                 </button>
                 
                 <div class="absolute right-0 top-full mt-1 w-32 bg-white rounded-md shadow-xl border border-gray-100 z-20 hidden group-hover:block">
-                     <button
+                      <button
                         type="button"
                         class="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                         @click="
@@ -154,7 +182,7 @@
                           listDeleteOpen = true;
                         "
                       >
-                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                         ลบลิสต์
                       </button>
                 </div>
@@ -169,11 +197,26 @@
           >
             {% for task in lst.tasks.all %}
               <div 
-                class="transform transition hover:-translate-y-1 duration-200"
+                class="transform transition hover:-translate-y-1 duration-200 cursor-pointer" 
                 draggable="true"
                 data-task-id="{{ task.id }}"
                 @dragstart="onDragStartTask($event, {{ task.id }})"
                 @dragend="onDragEndTask($event)"
+                {# ✅ เพิ่ม @click เพื่อเปิด Popup แก้ไขและโหลดข้อมูลรวมถึง Labels #}
+                @click="
+                    taskMode = 'edit';
+                    taskModalOpen = true;
+                    taskListTitle = '{{ lst.title|escapejs }}';
+                    taskActionUrl = '{% url 'task_update' task.id %}';
+                    taskTitle = '{{ task.title|escapejs }}';
+                    taskDescription = '{{ task.description|escapejs }}';
+                    taskAssignedTo = '{{ task.assigned_to.id|default_if_none:'' }}';
+                    taskPriority = '{{ task.priority }}';
+                    taskDueDate = '{{ task.due_date|date:'Y-m-d\TH:i' }}';
+                    
+                    // ⭐ โหลด ID ของป้ายกำกับเดิมใส่เข้าไปใน Array taskLabels ⭐
+                    taskLabels = [{% for label in task.labels.all %}{{ label.id }}{% if not forloop.last %},{% endif %}{% endfor %}];
+                "
               >
                   {% include "boards/components/task_card.html" with task=task lst=lst %}
               </div>
@@ -199,6 +242,7 @@
                 taskAssignedTo = '';
                 taskPriority = 'medium';
                 taskDueDate = '';
+                taskLabels = []; // ✅ เคลียร์ป้ายกำกับให้ว่างเมื่อสร้างงานใหม่
               "
             >
               <span class="text-lg leading-none">+</span>
@@ -240,7 +284,5 @@
   {% include "boards/components/popup_list_delete.html" %}
   {% include "boards/components/popup_add_member.html" %}
   
-  
-
 </div>
 {% endblock %}

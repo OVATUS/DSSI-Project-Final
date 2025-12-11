@@ -6,6 +6,7 @@ urlpatterns = [
     path("projects/", project_page, name="project_page"),
 
     # BOARD
+    path('board/<int:board_id>/star/', toggle_star_board, name='board_star'),
     path("create/", board_create, name="board_create"),
     path("<int:board_id>/", board_detail, name="board_detail"),
     path("<int:board_id>/edit/", board_update, name="board_update"),
@@ -22,6 +23,7 @@ urlpatterns = [
     path("task/<int:task_id>/edit/", task_update, name="task_update"),
     path("task/<int:task_id>/delete/", task_delete, name="task_delete"),
     path("task/move/", task_move, name="task_move"),
+    path('board/<int:board_id>/label/create/', create_label, name='create_label'),
 
     #Comment 
     path("task/<int:task_id>/comments/", get_comments, name="get_comments"),

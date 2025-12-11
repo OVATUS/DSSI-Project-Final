@@ -141,7 +141,116 @@
                   class="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white py-2 text-gray-600"
                 />
               </div>
-            </div>
+              <div 
+  class="col-span-1 sm:col-span-3 space-y-2 mt-2 pt-2 border-t border-gray-100"
+  x-data="{ showCreateLabel: false, newLabelName: '', newLabelColor: 'bg-blue-500' }"
+>
+  <div class="flex justify-between items-center">
+      <label class="block text-sm font-semibold text-gray-700">ป้ายกำกับ (Labels)</label>
+      <button 
+        type="button" 
+        @click="showCreateLabel = !showCreateLabel" 
+        class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1"
+      >
+          <span x-text="showCreateLabel ? 'ยกเลิก' : '+ สร้างป้ายใหม่'"></span>
+      </button>
+  </div>
+
+  <div x-show="showCreateLabel" x-transition class="bg-gray-50 p-3 rounded-lg border border-gray-200 mb-2 space-y-3">
+    
+    <div>
+        <input type="text" x-model="newLabelName" placeholder="ชื่อป้าย (เช่น ด่วน, Bug)" 
+               class="w-full text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 px-3 py-1.5 placeholder-gray-400">
+    </div>
+    
+    <div>
+        <div class="text-xs text-gray-500 mb-1">เลือกสี:</div>
+        <div class="flex flex-wrap gap-2">
+            <button type="button" @click="newLabelColor = 'bg-red-500'" :class="{'ring-2 ring-offset-2 ring-gray-400 scale-110': newLabelColor === 'bg-red-500'}" class="w-6 h-6 rounded-full bg-red-500 border border-white shadow-sm hover:scale-110 transition-all"></button>
+            <button type="button" @click="newLabelColor = 'bg-orange-500'" :class="{'ring-2 ring-offset-2 ring-gray-400 scale-110': newLabelColor === 'bg-orange-500'}" class="w-6 h-6 rounded-full bg-orange-500 border border-white shadow-sm hover:scale-110 transition-all"></button>
+            <button type="button" @click="newLabelColor = 'bg-yellow-400'" :class="{'ring-2 ring-offset-2 ring-gray-400 scale-110': newLabelColor === 'bg-yellow-400'}" class="w-6 h-6 rounded-full bg-yellow-400 border border-white shadow-sm hover:scale-110 transition-all"></button>
+            <button type="button" @click="newLabelColor = 'bg-green-500'" :class="{'ring-2 ring-offset-2 ring-gray-400 scale-110': newLabelColor === 'bg-green-500'}" class="w-6 h-6 rounded-full bg-green-500 border border-white shadow-sm hover:scale-110 transition-all"></button>
+            <button type="button" @click="newLabelColor = 'bg-blue-500'" :class="{'ring-2 ring-offset-2 ring-gray-400 scale-110': newLabelColor === 'bg-blue-500'}" class="w-6 h-6 rounded-full bg-blue-500 border border-white shadow-sm hover:scale-110 transition-all"></button>
+            <button type="button" @click="newLabelColor = 'bg-indigo-500'" :class="{'ring-2 ring-offset-2 ring-gray-400 scale-110': newLabelColor === 'bg-indigo-500'}" class="w-6 h-6 rounded-full bg-indigo-500 border border-white shadow-sm hover:scale-110 transition-all"></button>
+            <button type="button" @click="newLabelColor = 'bg-pink-500'" :class="{'ring-2 ring-offset-2 ring-gray-400 scale-110': newLabelColor === 'bg-pink-500'}" class="w-6 h-6 rounded-full bg-pink-500 border border-white shadow-sm hover:scale-110 transition-all"></button>
+            <button type="button" @click="newLabelColor = 'bg-gray-500'" :class="{'ring-2 ring-offset-2 ring-gray-400 scale-110': newLabelColor === 'bg-gray-500'}" class="w-6 h-6 rounded-full bg-gray-500 border border-white shadow-sm hover:scale-110 transition-all"></button>
+        </div>
+    </div>
+
+    <div class="flex items-center gap-2 p-2 bg-white rounded border border-gray-100">
+        <span class="text-xs text-gray-400">ตัวอย่าง:</span>
+        <div 
+            class="px-3 py-1 rounded-full text-xs font-medium text-white shadow-sm transition-all"
+            :class="newLabelColor"
+        >
+            <span x-text="newLabelName || 'ชื่อป้ายกำกับ'"></span>
+        </div>
+    </div>
+
+    <button type="button" 
+        @click="
+            if(!newLabelName) return;
+            fetch('{% url 'create_label' board.id %}', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({ name: newLabelName, color: newLabelColor })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    const container = document.getElementById('label-container');
+                    const html = `
+                    <label class='cursor-pointer relative group'>
+                        <input type='checkbox' name='labels' value='${data.id}' class='peer sr-only' checked>
+                        <div class='px-3 py-1 rounded-full text-xs font-medium text-white opacity-40 hover:opacity-100 peer-checked:opacity-100 peer-checked:ring-2 peer-checked:ring-offset-1 peer-checked:ring-gray-400 transition-all ${data.color} shadow-sm'>
+                            ${data.name}
+                        </div>
+                        <svg class='h-3 w-3 absolute -top-1 -right-1 text-green-600 bg-white rounded-full block shadow-sm' viewBox='0 0 20 20' fill='currentColor'><path fill-rule='evenodd' d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z' clip-rule='evenodd' /></svg>
+                    </label>`;
+                    container.insertAdjacentHTML('beforeend', html);
+                    
+                    const noLabelText = document.getElementById('no-label-text');
+                    if(noLabelText) noLabelText.style.display = 'none';
+
+                    newLabelName = '';
+                    showCreateLabel = false;
+                    if(typeof taskLabels !== 'undefined') taskLabels.push(data.id);
+                }
+            })
+        "
+        class="w-full bg-indigo-600 text-white text-xs font-bold py-1.5 rounded-md hover:bg-indigo-700 transition shadow-sm"
+    >
+        บันทึกป้ายใหม่
+    </button>
+  </div>
+
+  <div id="label-container" class="flex flex-wrap gap-2 min-h-[30px]">
+      {% for label in labels %}
+      <label class="cursor-pointer relative group">
+          <input 
+              type="checkbox" 
+              name="labels" 
+              value="{{ label.id }}" 
+              class="peer sr-only"
+              :checked="taskLabels.includes({{ label.id }})"
+          >
+          <div class="px-3 py-1 rounded-full text-xs font-medium text-white opacity-40 hover:opacity-100 peer-checked:opacity-100 peer-checked:ring-2 peer-checked:ring-offset-1 peer-checked:ring-gray-400 transition-all {{ label.color }} shadow-sm">
+              {{ label.name }}
+          </div>
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 absolute -top-1 -right-1 text-green-600 bg-white rounded-full hidden peer-checked:block shadow-sm z-10" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+          </svg>
+      </label>
+      {% empty %}
+          <p id="no-label-text" class="text-xs text-gray-400 bg-gray-50 p-2 rounded border border-dashed border-gray-300 w-full text-center">
+              ยังไม่มีป้ายกำกับ (กดสร้างใหม่ด้านบนได้เลย)
+          </p>
+      {% endfor %}
+  </div>
+</div>
 
             <div class="pt-4 flex items-center gap-3">
               <button

@@ -50,6 +50,7 @@ window.boardDetailPage = function (config) {
         taskAssignedTo: '',
         taskDueDate: '',
         taskPriority: 'medium',
+        taskLabels: [],
 
         // ==== List Modal ====
        listModalOpen: false,
