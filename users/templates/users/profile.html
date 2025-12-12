@@ -1,32 +1,26 @@
 {% extends 'base.html' %} {% block sidebar %}{% endblock %} {% block content %}
 <div x-data="{ open: false }" class="w-full flex justify-center py-10">
   <div class="w-full max-w-5xl">
-    <!-- การ์ดโปรไฟล์หลัก -->
     <div class="bg-[#BDEBFF] rounded-xl shadow-lg overflow-hidden">
       <div class="bg-linear-to-r from-[#0094FF] to-[#5FC2FF] h-24 w-full"></div>
 
       <div class="px-10 pb-10 -mt-16">
         <div class="flex items-start gap-6">
-          <!-- รูปโปรไฟล์ -->
-          <div
-            class="w-28 h-28 rounded-full bg-white shadow-md overflow-hidden border-4 border-white"
-          >
+          
+          <div class="w-28 h-28 rounded-full bg-white shadow-md overflow-hidden border-4 border-white">
             {% if request.user.profile_image %}
-            <img
-              src="{{ request.user.profile_image.url }}"
-              alt="Profile"
-              class="w-full h-full object-cover"
-            />
+              <img
+                src="{{ request.user.profile_image.url }}"
+                alt="Profile"
+                class="w-full h-full object-cover"
+              />
             {% else %}
-            <div
-              class="w-full h-full flex items-center justify-center text-sm text-gray-400"
-            >
-              ไม่มีรูป
-            </div>
+              <div class="w-full h-full bg-blue-500 flex items-center justify-center text-white text-5xl font-bold">
+                {{ request.user.username|slice:":1"|upper }}
+              </div>
             {% endif %}
           </div>
 
-          <!-- ข้อมูลข้อความ -->
           <div class="flex-1 mt-4">
             <div class="flex items-center justify-between">
               <div>
@@ -41,7 +35,6 @@
                 </p>
               </div>
 
-              <!-- ปุ่มเปิด popup -->
               <button
                 @click="open = true"
                 class="px-5 py-2 rounded-full bg-[#0094FF] text-white text-sm font-semibold shadow hover:bg-[#0077cc]"
@@ -54,10 +47,9 @@
       </div>
     </div>
 
-    <!-- โซนอันตราย -->
     <div class="mt-8 bg-red-50 border border-red-200 rounded-xl p-6">
-      <h4 class="text-red-700 font-bold mb-2">โซนอันตราย</h4>
-      <p class="text-sm text-red-600 mb-4">
+       <h4 class="text-red-700 font-bold mb-2">โซนอันตราย</h4>
+       <p class="text-sm text-red-600 mb-4">
         หากลบบัญชี ข้อมูลทั้งหมดจะหายไปและกู้คืนไม่ได้
       </p>
       <form method="post">
@@ -74,7 +66,6 @@
     </div>
   </div>
 
-  <!-- POPUP แก้ไขโปรไฟล์ -->
   <div
     x-cloak
     x-show="open"
@@ -84,11 +75,12 @@
     <div
       @click.outside="open = false"
       class="bg-[#333333] text-white rounded-xl shadow-xl w-full max-w-xl p-8 relative"
+      
+      {# ✅ จุดสำคัญ: ใช้ {% if %} เช็คก่อนดึง url เพื่อแก้ ValueError #}
       x-data="{
-      preview: '{{ request.user.profile_image.url|default_if_none:'' }}'
-    }"
+        preview: '{% if request.user.profile_image %}{{ request.user.profile_image.url }}{% endif %}'
+      }"
     >
-      <!-- ปุ่มปิด X -->
       <button
         type="button"
         @click="open = false"
@@ -97,25 +89,23 @@
         &times;
       </button>
 
-      <!-- ส่วนหัว + รูปโปรไฟล์ (มี preview) -->
       <div class="flex flex-col items-center mb-6">
         <div
           class="w-24 h-24 rounded-full overflow-hidden border-2 border-white mb-3 bg-gray-700 flex items-center justify-center"
         >
-          <!-- ถ้ามี preview ให้ใช้รูปนั้น -->
           <template x-if="preview">
             <img :src="preview" class="w-full h-full object-cover" />
           </template>
 
-          <!-- ถ้าไม่มี preview / ไม่มีรูปเดิม -->
           <template x-if="!preview">
-            <div class="text-sm text-gray-300">ไม่มีรูป</div>
+            <div class="w-full h-full bg-blue-500 flex items-center justify-center text-white text-4xl font-bold">
+                {{ request.user.username|slice:":1"|upper }}
+            </div>
           </template>
         </div>
         <p class="text-sm text-gray-300">อัปโหลดรูปใหม่ของคุณ</p>
       </div>
 
-      <!-- ฟอร์มแก้ไข -->
       <form method="post" enctype="multipart/form-data" class="space-y-6">
         {% csrf_token %}
 
@@ -136,7 +126,7 @@
             type="file"
             name="profile_image"
             accept="image/*"
-            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0094FF] text-sm"
+            class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0094FF] text-sm text-gray-800 bg-white"
             @change="if ($event.target.files[0]) 
               preview = URL.createObjectURL($event.target.files[0])"
           />

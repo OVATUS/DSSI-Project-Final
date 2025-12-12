@@ -235,7 +235,7 @@
               name="labels" 
               value="{{ label.id }}" 
               class="peer sr-only"
-              :checked="taskLabels.includes({{ label.id }})"
+              x-model="taskLabels"
           >
           <div class="px-3 py-1 rounded-full text-xs font-medium text-white opacity-40 hover:opacity-100 peer-checked:opacity-100 peer-checked:ring-2 peer-checked:ring-offset-1 peer-checked:ring-gray-400 transition-all {{ label.color }} shadow-sm">
               {{ label.name }}

@@ -39,6 +39,7 @@ window.boardDetailPage = function (config) {
 
         // ==== Member & UI ====
         addMemberOpen: false,
+        filterMember: '',
 
         // ==== Task Modal ====
         taskModalOpen: false,
@@ -51,6 +52,7 @@ window.boardDetailPage = function (config) {
         taskDueDate: '',
         taskPriority: 'medium',
         taskLabels: [],
+        
 
         // ==== List Modal ====
        listModalOpen: false,

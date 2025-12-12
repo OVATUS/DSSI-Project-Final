@@ -1,4 +1,137 @@
+{# board/templates/boards/dashboard.html #}
 {% extends 'base.html' %}
-{% block content %}
 
-{%endblock%}
+{% block content %}
+<div class="p-6 md:p-10 max-w-6xl mx-auto space-y-8">
+
+    {# --- Header --- #}
+    <div>
+        <h1 class="text-3xl font-extrabold text-gray-800">Dashboard</h1>
+        <p class="text-gray-500 mt-1">จัดการคำเชิญและสถานะโปรเจกต์ของคุณ</p>
+    </div>
+
+    {# --- Grid Layout --- #}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+        {# ========================================== #}
+        {#  BOX 1: คำเชิญถึงฉัน (Invitations Received)  #}
+        {# ========================================== #}
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+            <div class="px-6 py-4 bg-indigo-50 border-b border-indigo-100 flex items-center justify-between">
+                <h2 class="text-lg font-bold text-indigo-900 flex items-center gap-2">
+                    📥 คำเชิญถึงฉัน
+                    {% if received_invites %}
+                        <span class="bg-indigo-600 text-white text-xs px-2 py-0.5 rounded-full">{{ received_invites.count }}</span>
+                    {% endif %}
+                </h2>
+            </div>
+            
+            <div class="divide-y divide-gray-100">
+                {% for invite in received_invites %}
+                    <div class="p-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between hover:bg-gray-50 transition-colors">
+                        {# ข้อมูลคนเชิญ #}
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-lg border-2 border-white shadow-sm">
+                                {% if invite.sender.profile_image %}
+                                    <img src="{{ invite.sender.profile_image.url }}" class="w-full h-full rounded-full object-cover">
+                                {% else %}
+                                    {{ invite.sender.username|slice:":1"|upper }}
+                                {% endif %}
+                            </div>
+                            <div>
+                                <p class="text-gray-900 font-medium">
+                                    <span class="font-bold text-indigo-600">{{ invite.sender.username }}</span> เชิญคุณเข้าร่วม
+                                </p>
+                                <p class="text-sm text-gray-500">
+                                    โปรเจกต์: <span class="font-semibold text-gray-700">"{{ invite.board.name }}"</span>
+                                </p>
+                                <p class="text-xs text-gray-400 mt-1">{{ invite.created_at|date:"d M Y H:i" }}</p>
+                            </div>
+                        </div>
+
+                        {# ปุ่ม Action #}
+                        <div class="flex gap-2 w-full sm:w-auto">
+                            <a href="{% url 'respond_invitation' invite.id 'accept' %}" class="flex-1 sm:flex-none bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-all text-center">
+                                ยอมรับ
+                            </a>
+                            <a href="{% url 'respond_invitation' invite.id 'decline' %}" class="flex-1 sm:flex-none bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-semibold transition-all text-center">
+                                ปฏิเสธ
+                            </a>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="p-8 text-center text-gray-400 flex flex-col items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-3 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                        </svg>
+                        <p>ไม่มีคำเชิญใหม่ในขณะนี้</p>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+
+        {# ========================================== #}
+        {#  BOX 2: คำเชิญที่ส่งไป (Pending Sent)        #}
+        {# ========================================== #}
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+            <div class="px-6 py-4 bg-orange-50 border-b border-orange-100 flex items-center justify-between">
+                <h2 class="text-lg font-bold text-orange-900 flex items-center gap-2">
+                    ⏳ รอการตอบรับ
+                    {% if sent_invites %}
+                        <span class="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full">{{ sent_invites.count }}</span>
+                    {% endif %}
+                </h2>
+            </div>
+            
+            <div class="divide-y divide-gray-100">
+                {% for invite in sent_invites %}
+                    <div class="p-6 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                        <div class="flex items-center gap-3">
+                             <div class="w-10 h-10 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center font-bold text-lg border-2 border-white shadow-sm">
+                                {% if invite.recipient.profile_image %}
+                                    <img src="{{ invite.recipient.profile_image.url }}" class="w-full h-full rounded-full object-cover">
+                                {% else %}
+                                    {{ invite.recipient.username|slice:":1"|upper }}
+                                {% endif %}
+                            </div>
+                            <div>
+                                <p class="text-gray-900 font-medium">
+                                    คุณเชิญ <span class="font-bold text-orange-600">{{ invite.recipient.username }}</span>
+                                </p>
+                                <p class="text-sm text-gray-500">
+                                    เข้าร่วม: <span class="font-semibold text-gray-700">{{ invite.board.name }}</span>
+                                </p>
+                                <p class="text-xs text-gray-400 mt-1">ส่งเมื่อ: {{ invite.created_at|date:"d M Y" }}</p>
+                            </div>
+                        </div>
+                        
+                        <span class="text-xs font-semibold px-2.5 py-1 bg-yellow-100 text-yellow-700 rounded-full">
+                            รอการตอบกลับ
+                        </span>
+                    </div>
+                {% empty %}
+                     <div class="p-8 text-center text-gray-400 flex flex-col items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-3 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                        </svg>
+                        <p>ไม่มีรายการที่รอการตอบรับ</p>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+    </div>
+
+    {# ปุ่มทางลัดไปหน้า Projects #}
+    <div class="flex justify-center pt-4">
+        <a href="{% url 'project_page' %}" class="flex items-center gap-2 text-indigo-600 font-semibold hover:text-indigo-800 hover:underline transition">
+            <span>ไปที่หน้าโปรเจกต์ทั้งหมด</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+            </svg>
+        </a>
+    </div>
+
+</div>
+{% endblock %}

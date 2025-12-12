@@ -4,22 +4,84 @@
 {% block content %}
 <div x-data="projectPage()" class="relative p-4">
 
-  {# --- SEARCH BAR --- #}
-  <div class="flex justify-center mt-4">
+  {# --- SEARCH BAR WITH DROPDOWN --- #}
+<div class="flex justify-center mt-4 relative z-30" 
+     x-data="{
+        query: '{{ search_query|default_if_none:""|escapejs }}',
+        results: [],
+        isOpen: false,
+        fetchResults() {
+            if (this.query.length < 1) {
+                this.results = [];
+                this.isOpen = false;
+                return;
+            }
+            // เรียก API ที่เราสร้างไว้
+            fetch(`{% url 'search_boards_api' %}?q=${encodeURIComponent(this.query)}`)
+                .then(res => res.json())
+                .then(data => {
+                    this.results = data.results;
+                    this.isOpen = true;
+                });
+        }
+     }"
+     @click.outside="isOpen = false"
+>
     <form method="get" action="{% url 'project_page' %}" class="w-full max-w-2xl relative">
       <input
         type="text"
         name="q" 
-        value="{{ search_query|default_if_none:'' }}" 
+        x-model="query"
+        @input.debounce.300ms="fetchResults()" 
+        @focus="if(query.length > 0) fetchResults()"
         placeholder="ค้นหาชื่อโปรเจกต์..."
-        class="w-full py-2 pl-10 pr-4 rounded-full bg-gray-200 outline-none focus:ring-2 focus:ring-blue-400 transition-all"
+        class="w-full py-2 pl-10 pr-4 rounded-full bg-gray-200 outline-none focus:ring-2 focus:ring-blue-400 transition-all border border-transparent focus:bg-white shadow-sm"
         autocomplete="off"
       />
+      
       <button type="submit" class="absolute left-3 top-2.5 text-gray-500 hover:text-blue-600 cursor-pointer bg-transparent border-none p-0">
           🔍 
       </button>
+
+      <div 
+        x-show="isOpen && results.length > 0"
+        x-transition:enter="transition ease-out duration-100"
+        x-transition:enter-start="opacity-0 scale-95"
+        x-transition:enter-end="opacity-100 scale-100"
+        class="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden"
+        style="display: none;"
+      >
+        <ul>
+            <template x-for="board in results" :key="board.id">
+                <li>
+                    <a :href="'/board/' + board.id + '/'" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0">
+                        <div class="w-8 h-8 rounded bg-gray-200 overflow-hidden shrink-0">
+                            <template x-if="board.cover">
+                                <img :src="board.cover" class="w-full h-full object-cover">
+                            </template>
+                            <template x-if="!board.cover">
+                                <div class="w-full h-full flex items-center justify-center bg-indigo-100 text-indigo-500 text-xs font-bold">
+                                    <span x-text="board.name.charAt(0).toUpperCase()"></span>
+                                </div>
+                            </template>
+                        </div>
+                        
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium text-gray-800 truncate" x-text="board.name"></p>
+                            <p class="text-[10px] text-gray-400">ไปที่โปรเจกต์</p>
+                        </div>
+                    </a>
+                </li>
+            </template>
+        </ul>
+        
+        <button type="submit" class="w-full text-center py-2 text-xs text-blue-600 bg-blue-50 hover:bg-blue-100 font-medium transition-colors">
+            ดูผลลัพธ์ทั้งหมดสำหรับ "<span x-text="query"></span>"
+        </button>
+      </div>
+
     </form>
-  </div>
+</div>
 
   {# --- SECTION 1: Favorite Projects (Project ที่ติดดาว) --- #}
   <div class="mt-8">

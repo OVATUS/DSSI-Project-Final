@@ -26,6 +26,22 @@ class Board(models.Model):
     def __str__(self):
         return self.name
 
+class BoardInvitation(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('accepted', 'Accepted'),
+        ('declined', 'Declined'),
+    ]
+    
+    board = models.ForeignKey(Board, on_delete=models.CASCADE, related_name='invitations')
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_invitations')
+    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_invitations')
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.sender} invited {self.recipient} to {self.board}"
+
 class Label(models.Model):
     board = models.ForeignKey(Board, on_delete=models.CASCADE, related_name='labels')
     name = models.CharField(max_length=50)

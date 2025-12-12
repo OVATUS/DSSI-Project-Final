@@ -1,7 +1,7 @@
 from django.db import models
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
-from .models import Board, List, Task, Comment , Label
+from .models import Board, List, Task, Comment , Label , BoardInvitation
 from .forms import BoardForm, ListForm, TaskForm
 from users.models import User
 from django.http import JsonResponse
@@ -10,8 +10,25 @@ from django.db.models import Max
 from django.db.models import Q
 import json
 
+@login_required
 def board_lsit_view(request):
-    return render (request, 'boards/dashboard.html')
+    # 1. คำเชิญถึงฉัน (คนอื่นเชิญเรา)
+    received_invites = BoardInvitation.objects.filter(
+        recipient=request.user, 
+        status='pending'
+    ).select_related('sender', 'board')
+
+    # 2. คำเชิญที่เราส่งไป (เราเชิญคนอื่น แล้วเขายังไม่ตอบ)
+    sent_invites = BoardInvitation.objects.filter(
+        sender=request.user, 
+        status='pending'
+    ).select_related('recipient', 'board')
+
+    context = {
+        'received_invites': received_invites,
+        'sent_invites': sent_invites,
+    }
+    return render(request, 'boards/dashboard.html', context)
 
 @login_required
 @require_POST
@@ -220,6 +237,10 @@ def task_update(request, task_id):
         form = TaskForm(request.POST, instance=task)
         if form.is_valid():
             form.save()
+
+            label_ids = request.POST.getlist('labels')
+            task.labels.set(label_ids)
+
             return redirect("board_detail", board_id=task.list.board.id)
     else:
         form = TaskForm(instance=task)
@@ -326,22 +347,34 @@ def list_reorder(request, board_id):
 @require_POST
 @login_required
 def add_member(request, board_id):
-    # เฉพาะเจ้าของบอร์ดเท่านั้นที่มีสิทธิ์เชิญคนเพิ่ม (หรือจะให้สมาชิกเชิญด้วยก็ได้ แล้วแต่ตกลง)
-    # ในที่นี้ให้เฉพาะเจ้าของเชิญได้ก่อน
     board = get_object_or_404(Board, id=board_id, created_by=request.user)
-    
     username = request.POST.get("username")
     
     try:
-        user_to_add = User.objects.get(username=username)
-        # ป้องกันการเชิญตัวเอง หรือเชิญคนที่มีอยู่แล้ว
-        if user_to_add != request.user and user_to_add not in board.members.all():
-            board.members.add(user_to_add)
+        user_to_invite = User.objects.get(username=username)
+        
+        # เช็คว่าอยู่ในบอร์ดแล้วหรือยัง
+        if user_to_invite in board.members.all() or user_to_invite == board.created_by:
+            # (อาจจะส่ง message บอกว่าอยู่แล้ว)
+            pass
+        else:
+            # เช็คว่าเคยเชิญไปแล้วและสถานะเป็น Pending ไหม (กันส่งซ้ำ)
+            existing_invite = BoardInvitation.objects.filter(
+                board=board, 
+                recipient=user_to_invite, 
+                status='pending'
+            ).exists()
+            
+            if not existing_invite:
+                BoardInvitation.objects.create(
+                    board=board,
+                    sender=request.user,
+                    recipient=user_to_invite
+                )
     except User.DoesNotExist:
-        pass # หรือจะส่ง message error กลับไปก็ได้
+        pass 
         
     return redirect("board_detail", board_id=board.id)
-
 
 @login_required
 def get_comments(request, task_id):
@@ -424,3 +457,59 @@ def create_label(request, board_id):
         })
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+# board/views.py
+from django.http import JsonResponse # (เช็คดูด้านบนไฟล์ว่ามีหรือยัง)
+
+@login_required
+def search_boards_api(request):
+    query = request.GET.get('q', '').strip()
+    
+    if len(query) < 1:
+        return JsonResponse({'results': []})
+
+    # ค้นหาบอร์ดที่เรามีสิทธิ์เห็น (เป็นเจ้าของ หรือ เป็นสมาชิก)
+    boards = Board.objects.filter(
+        Q(created_by=request.user) | Q(members=request.user),
+        name__icontains=query
+    ).distinct().order_by('-updated_at')[:5]  # จำกัดแค่ 5 อันดับล่าสุด
+
+    results = []
+    for b in boards:
+        results.append({
+            'id': b.id,
+            'name': b.name,
+            # ส่ง URL รูปปกไปด้วย (ถ้ามี) เพื่อความสวยงาม
+            'cover': b.cover_image.url if b.cover_image else None 
+        })
+
+    return JsonResponse({'results': results})
+
+@login_required
+@require_POST
+def remove_member(request, board_id, user_id):
+    board = get_object_or_404(Board, id=board_id)
+    
+    # เฉพาะเจ้าของบอร์ดเท่านั้นที่มีสิทธิ์ลบ
+    if request.user != board.created_by:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+
+    user_to_remove = get_object_or_404(User, id=user_id)
+    board.members.remove(user_to_remove)
+    
+    return redirect('board_detail', board_id=board.id)
+
+@login_required
+def respond_invitation(request, invite_id, action):
+    invite = get_object_or_404(BoardInvitation, id=invite_id, recipient=request.user, status='pending')
+    
+    if action == 'accept':
+        invite.status = 'accepted'
+        invite.save()
+        # เพิ่มเข้าบอร์ดจริงๆ
+        invite.board.members.add(request.user)
+    elif action == 'decline':
+        invite.status = 'declined'
+        invite.save()
+        
+    return redirect('project_page') # หรือหน้า inbox ที่เราจะสร้าง

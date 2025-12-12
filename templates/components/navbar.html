@@ -1,14 +1,22 @@
-<header class="flex items-center justify-between px-6 h-14 bg-[#0094FF] text-white">
+<header class="fixed top-0 left-0 w-full h-14  bg-[#0094FF] text-white flex items-center justify-between px-6 shadow-md">
     <div class="text-2xl font-extrabold tracking-wider">
-        <a href ={% url 'home' %}>
+        <a href="{% url 'home' %}">
             WORK WAI D
         </a>
     </div>
 
     <div class="flex items-center gap-3">
         <span class="text-sm font-semibold uppercase">{{ request.user.username }}</span>
-        <div  class="w-8 h-8 rounded-full bg-white overflow-hidden">
-            <a href={% url 'profile' %}><img src="{{ request.user.profile_image.url }}" class="w-full h-full object-cover"> </a>
+        <div class="w-8 h-8 rounded-full bg-white overflow-hidden border border-white">
+             <a href="{% url 'profile' %}" class="block w-full h-full">
+                {% if request.user.profile_image %}
+                    <img src="{{ request.user.profile_image.url }}" class="w-full h-full object-cover">
+                {% else %}
+                    <div class="w-full h-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">
+                        {{ request.user.username|slice:":1"|upper }}
+                    </div>
+                {% endif %}
+            </a>
         </div>
     </div>
 </header>
