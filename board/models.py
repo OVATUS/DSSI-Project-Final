@@ -1,6 +1,7 @@
 from django.db import models
 from users.models import User
 from django.conf import settings
+import os
 
 COLOR_CHOICES = [
     ('bg-red-500', 'สีแดง (Red)'),
@@ -116,3 +117,40 @@ class Comment(models.Model):
     def __str__(self):
         return f"Comment by {self.author.username} on {self.task.title}"
 
+class ChecklistItem(models.Model):
+    task = models.ForeignKey(
+        Task, 
+        on_delete=models.CASCADE, 
+        related_name='checklist_items'
+    )
+    content = models.CharField(max_length=255)
+    is_completed = models.BooleanField(default=False)
+    position = models.PositiveIntegerField(default=0)  # เผื่อเรียงลำดับ (Optional)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['position', 'created_at']
+
+    def __str__(self):
+        return f"{self.content} ({'Done' if self.is_completed else 'To Do'})"
+
+class Attachment(models.Model):
+    task = models.ForeignKey(
+        Task, 
+        on_delete=models.CASCADE, 
+        related_name='attachments'
+    )
+    file = models.FileField(upload_to='task_attachments/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return os.path.basename(self.file.name)
+    
+    # ฟังก์ชันช่วยดึงชื่อไฟล์มาแสดงแบบสวยๆ
+    def filename(self):
+        return os.path.basename(self.file.name)
+        
+    # เช็คว่าเป็นรูปภาพหรือไม่ (เผื่อเอาไปโชว์พรีวิว)
+    def is_image(self):
+        name = self.filename().lower()
+        return name.endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp'))
