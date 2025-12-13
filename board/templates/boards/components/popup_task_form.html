@@ -8,7 +8,7 @@
   x-transition:leave="transition ease-in duration-150"
   x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
   x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-  class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
+  class="fixed inset-0 z-60 flex items-center justify-center p-4 sm:p-6"
 >
   <div
     class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity"
@@ -64,195 +64,428 @@
           <form method="post" :action="taskActionUrl" class="space-y-6">
             {% csrf_token %}
 
-            <div class="space-y-2">
-              <label class="block text-sm font-semibold text-gray-700"
-                >หัวข้องาน <span class="text-red-500">*</span></label
-              >
-              <input
-                type="text"
-                name="title"
-                x-model="taskTitle"
-                class="w-full text-lg font-medium placeholder-gray-400 border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 px-4 py-3 bg-gray-50/50 hover:bg-white transition-colors"
-                placeholder="เช่น ออกแบบหน้า Home, แก้ไข Bug Login..."
-                required
-              />
-            </div>
-
-            <div class="space-y-2">
-              <label class="block text-sm font-semibold text-gray-700"
-                >รายละเอียด</label
-              >
-              <textarea
-                name="description"
-                x-model="taskDescription"
-                rows="5"
-                class="w-full text-sm border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 px-4 py-3 bg-gray-50/50 hover:bg-white transition-colors placeholder-gray-400"
-                placeholder="เพิ่มรายละเอียดที่จำเป็น..."
-              ></textarea>
-            </div>
-
-            <div
-              class="bg-gray-50 rounded-xl p-4 border border-gray-100 grid grid-cols-1 sm:grid-cols-3 gap-4"
-            >
-              <div>
-                <label
-                  class="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wider"
-                  >ผู้รับผิดชอบ</label
-                >
-                <div class="relative">
-                  <select
-                    name="assigned_to"
-                    x-model="taskAssignedTo"
-                    class="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white pl-3 pr-8 py-2"
-                  >
-                    <option value="">-- ไม่ระบุ --</option>
-                    {% for u in users %}
-                    <option value="{{ u.id }}">{{ u.username }}</option>
-                    {% endfor %}
-                  </select>
+            {# --- SECTION 1: หัวข้องาน --- #}
+            <div>
+                <div class="flex items-center gap-2 mb-3 pb-2 border-b-2 border-gray-100">
+                    <span class="text-indigo-500 text-lg">📋</span>
+                    <h4 class="font-bold text-gray-800 text-sm uppercase tracking-wide">หัวข้องาน (Task Title)</h4>
                 </div>
+                
+                <div class="space-y-2">
+                    <label class=" text-sm font-semibold text-gray-700 hidden"
+                        >หัวข้องาน <span class="text-red-500">*</span></label
+                    >
+                    <input
+                        type="text"
+                        name="title"
+                        x-model="taskTitle"
+                        class="w-full text-lg font-medium placeholder-gray-400 border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 px-4 py-3 bg-gray-50/50 hover:bg-white transition-colors"
+                        placeholder="เช่น ออกแบบหน้า Home, แก้ไข Bug Login..."
+                        required
+                    />
+                </div>
+            </div>
+
+            {# --- SECTION 2: รายละเอียด --- #}
+            <div>
+                <div class="flex items-center gap-2 mb-3 pb-2 border-b-2 border-gray-100 mt-6">
+                    <span class="text-indigo-500 text-lg">📝</span>
+                    <h4 class="font-bold text-gray-800 text-sm uppercase tracking-wide">รายละเอียด (Description)</h4>
+                </div>
+
+                <div class="space-y-2">
+                    <textarea
+                        name="description"
+                        x-model="taskDescription"
+                        rows="5"
+                        class="w-full text-sm border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 px-4 py-3 bg-gray-50/50 hover:bg-white transition-colors placeholder-gray-400"
+                        placeholder="เพิ่มรายละเอียดที่จำเป็น..."
+                    ></textarea>
+                </div>
+            </div>
+
+            <div x-show="taskMode === 'edit'" class="mt-6">
+              <div class="flex items-center gap-2 mb-3 pb-2 border-b-2 border-gray-100">
+                  <span class="text-indigo-500 text-lg">☑️</span>
+                  <div class="flex-1 flex items-center justify-between">
+                      <h4 class="font-bold text-gray-800 text-sm uppercase tracking-wide">รายการเช็คลิสต์ (Checklist)</h4>
+                      <span class="text-xs text-gray-500 font-medium" x-text="`${checklistItems.filter(i => i.is_completed).length}/${checklistItems.length}`"></span>
+                  </div>
               </div>
 
-              <div>
-                <label
-                  class="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wider"
-                  >ความสำคัญ</label
-                >
-                <select
-                  name="priority"
-                  x-model="taskPriority"
-                  class="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white py-2"
-                >
-                  {% for value, label in priority_choices %}
-                  <option value="{{ value }}">{{ label }}</option>
-                  {% endfor %}
-                </select>
+              <div class="w-full bg-gray-200 rounded-full h-1.5 mb-4" x-show="checklistItems.length > 0">
+                  <div class="bg-indigo-500 h-1.5 rounded-full transition-all duration-300"
+                      :style="`width: ${checklistItems.length > 0 ? (checklistItems.filter(i => i.is_completed).length / checklistItems.length) * 100 : 0}%`">
+                  </div>
               </div>
 
-              <div>
-                <label
-                  class="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wider"
-                  >กำหนดส่ง</label
-                >
-                <input
-                  type="datetime-local"
-                  name="due_date"
-                  x-model="taskDueDate"
-                  class="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white py-2 text-gray-600"
-                />
+              <div class="space-y-2 mb-3">
+                  <template x-for="(item, index) in checklistItems" :key="item.id">
+                      <div class="flex items-start gap-3 group hover:bg-gray-50 p-1.5 rounded-md transition-colors">
+                          <input 
+                              type="checkbox" 
+                              x-model="item.is_completed"
+                              @change="
+                                  fetch(`/board/checklist/${item.id}/update/`, {
+                                      method: 'POST',
+                                      headers: { 'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ is_completed: item.is_completed })
+                                  })
+                              "
+                              class="mt-1 w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
+                          >
+                          
+                          <span 
+                              x-text="item.content" 
+                              class="text-sm flex-1 break-words transition-all"
+                              :class="item.is_completed ? 'text-gray-400 line-through' : 'text-gray-700'"
+                          ></span>
+
+                          <button 
+                              type="button"
+                              class="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-0.5"
+                              @click="
+                                  if(confirm('ลบรายการนี้?')) {
+                                      fetch(`/board/checklist/${item.id}/delete/`, {
+                                          method: 'POST',
+                                          headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+                                      })
+                                      .then(res => res.json())
+                                      .then(data => {
+                                          if(data.success) {
+                                              checklistItems = checklistItems.filter(i => i.id !== item.id);
+                                          }
+                                      })
+                                  }
+                              "
+                          >
+                              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          </button>
+                      </div>
+                  </template>
               </div>
-              <div 
-  class="col-span-1 sm:col-span-3 space-y-2 mt-2 pt-2 border-t border-gray-100"
-  x-data="{ showCreateLabel: false, newLabelName: '', newLabelColor: 'bg-blue-500' }"
->
-  <div class="flex justify-between items-center">
-      <label class="block text-sm font-semibold text-gray-700">ป้ายกำกับ (Labels)</label>
-      <button 
-        type="button" 
-        @click="showCreateLabel = !showCreateLabel" 
-        class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1"
-      >
-          <span x-text="showCreateLabel ? 'ยกเลิก' : '+ สร้างป้ายใหม่'"></span>
-      </button>
-  </div>
 
-  <div x-show="showCreateLabel" x-transition class="bg-gray-50 p-3 rounded-lg border border-gray-200 mb-2 space-y-3">
-    
-    <div>
-        <input type="text" x-model="newLabelName" placeholder="ชื่อป้าย (เช่น ด่วน, Bug)" 
-               class="w-full text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 px-3 py-1.5 placeholder-gray-400">
-    </div>
-    
-    <div>
-        <div class="text-xs text-gray-500 mb-1">เลือกสี:</div>
-        <div class="flex flex-wrap gap-2">
-            <button type="button" @click="newLabelColor = 'bg-red-500'" :class="{'ring-2 ring-offset-2 ring-gray-400 scale-110': newLabelColor === 'bg-red-500'}" class="w-6 h-6 rounded-full bg-red-500 border border-white shadow-sm hover:scale-110 transition-all"></button>
-            <button type="button" @click="newLabelColor = 'bg-orange-500'" :class="{'ring-2 ring-offset-2 ring-gray-400 scale-110': newLabelColor === 'bg-orange-500'}" class="w-6 h-6 rounded-full bg-orange-500 border border-white shadow-sm hover:scale-110 transition-all"></button>
-            <button type="button" @click="newLabelColor = 'bg-yellow-400'" :class="{'ring-2 ring-offset-2 ring-gray-400 scale-110': newLabelColor === 'bg-yellow-400'}" class="w-6 h-6 rounded-full bg-yellow-400 border border-white shadow-sm hover:scale-110 transition-all"></button>
-            <button type="button" @click="newLabelColor = 'bg-green-500'" :class="{'ring-2 ring-offset-2 ring-gray-400 scale-110': newLabelColor === 'bg-green-500'}" class="w-6 h-6 rounded-full bg-green-500 border border-white shadow-sm hover:scale-110 transition-all"></button>
-            <button type="button" @click="newLabelColor = 'bg-blue-500'" :class="{'ring-2 ring-offset-2 ring-gray-400 scale-110': newLabelColor === 'bg-blue-500'}" class="w-6 h-6 rounded-full bg-blue-500 border border-white shadow-sm hover:scale-110 transition-all"></button>
-            <button type="button" @click="newLabelColor = 'bg-indigo-500'" :class="{'ring-2 ring-offset-2 ring-gray-400 scale-110': newLabelColor === 'bg-indigo-500'}" class="w-6 h-6 rounded-full bg-indigo-500 border border-white shadow-sm hover:scale-110 transition-all"></button>
-            <button type="button" @click="newLabelColor = 'bg-pink-500'" :class="{'ring-2 ring-offset-2 ring-gray-400 scale-110': newLabelColor === 'bg-pink-500'}" class="w-6 h-6 rounded-full bg-pink-500 border border-white shadow-sm hover:scale-110 transition-all"></button>
-            <button type="button" @click="newLabelColor = 'bg-gray-500'" :class="{'ring-2 ring-offset-2 ring-gray-400 scale-110': newLabelColor === 'bg-gray-500'}" class="w-6 h-6 rounded-full bg-gray-500 border border-white shadow-sm hover:scale-110 transition-all"></button>
-        </div>
-    </div>
-
-    <div class="flex items-center gap-2 p-2 bg-white rounded border border-gray-100">
-        <span class="text-xs text-gray-400">ตัวอย่าง:</span>
-        <div 
-            class="px-3 py-1 rounded-full text-xs font-medium text-white shadow-sm transition-all"
-            :class="newLabelColor"
-        >
-            <span x-text="newLabelName || 'ชื่อป้ายกำกับ'"></span>
-        </div>
-    </div>
-
-    <button type="button" 
-        @click="
-            if(!newLabelName) return;
-            fetch('{% url 'create_label' board.id %}', {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': '{{ csrf_token }}'
-                },
-                body: JSON.stringify({ name: newLabelName, color: newLabelColor })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if(data.success) {
-                    const container = document.getElementById('label-container');
-                    const html = `
-                    <label class='cursor-pointer relative group'>
-                        <input type='checkbox' name='labels' value='${data.id}' class='peer sr-only' checked>
-                        <div class='px-3 py-1 rounded-full text-xs font-medium text-white opacity-40 hover:opacity-100 peer-checked:opacity-100 peer-checked:ring-2 peer-checked:ring-offset-1 peer-checked:ring-gray-400 transition-all ${data.color} shadow-sm'>
-                            ${data.name}
-                        </div>
-                        <svg class='h-3 w-3 absolute -top-1 -right-1 text-green-600 bg-white rounded-full block shadow-sm' viewBox='0 0 20 20' fill='currentColor'><path fill-rule='evenodd' d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z' clip-rule='evenodd' /></svg>
-                    </label>`;
-                    container.insertAdjacentHTML('beforeend', html);
-                    
-                    const noLabelText = document.getElementById('no-label-text');
-                    if(noLabelText) noLabelText.style.display = 'none';
-
-                    newLabelName = '';
-                    showCreateLabel = false;
-                    if(typeof taskLabels !== 'undefined') taskLabels.push(data.id);
-                }
-            })
-        "
-        class="w-full bg-indigo-600 text-white text-xs font-bold py-1.5 rounded-md hover:bg-indigo-700 transition shadow-sm"
-    >
-        บันทึกป้ายใหม่
-    </button>
-  </div>
-
-  <div id="label-container" class="flex flex-wrap gap-2 min-h-[30px]">
-      {% for label in labels %}
-      <label class="cursor-pointer relative group">
-          <input 
-              type="checkbox" 
-              name="labels" 
-              value="{{ label.id }}" 
-              class="peer sr-only"
-              x-model="taskLabels"
-          >
-          <div class="px-3 py-1 rounded-full text-xs font-medium text-white opacity-40 hover:opacity-100 peer-checked:opacity-100 peer-checked:ring-2 peer-checked:ring-offset-1 peer-checked:ring-gray-400 transition-all {{ label.color }} shadow-sm">
-              {{ label.name }}
+              <div class="mt-2">
+                <div class="flex gap-2">
+                    <input 
+                        type="text" 
+                        x-model="newChecklistItem"
+                        @keydown.enter.prevent="
+                            if(!newChecklistItem.trim()) return;
+                            fetch(`/board/task/${taskId}/checklist/create/`, {
+                                method: 'POST',
+                                headers: { 'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ content: newChecklistItem })
+                            })
+                            .then(res => res.json())
+                            .then(data => {
+                                if(data.success) {
+                                    checklistItems.push({
+                                        id: data.id,
+                                        content: data.content,
+                                        is_completed: data.is_completed
+                                    });
+                                    newChecklistItem = ''; // เคลียร์ช่อง
+                                }
+                            })
+                        "
+                        class="flex-1 text-sm border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 px-3 py-1.5 placeholder-gray-400 bg-gray-50 focus:bg-white transition-colors"
+                        placeholder="เพิ่มรายการย่อย..."
+                    >
+                    <button 
+                        type="button"
+                        @click="
+                            if(!newChecklistItem.trim()) return;
+                            fetch(`/board/task/${taskId}/checklist/create/`, {
+                                method: 'POST',
+                                headers: { 'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ content: newChecklistItem })
+                            })
+                            .then(res => res.json())
+                            .then(data => {
+                                if(data.success) {
+                                    checklistItems.push({
+                                        id: data.id,
+                                        content: data.content,
+                                        is_completed: data.is_completed
+                                    });
+                                    newChecklistItem = '';
+                                }
+                            })
+                        "
+                        class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-md text-sm font-medium transition-colors"
+                    >
+                        เพิ่ม
+                    </button>
+                </div>
+            </div>
           </div>
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 absolute -top-1 -right-1 text-green-600 bg-white rounded-full hidden peer-checked:block shadow-sm z-10" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-          </svg>
-      </label>
-      {% empty %}
-          <p id="no-label-text" class="text-xs text-gray-400 bg-gray-50 p-2 rounded border border-dashed border-gray-300 w-full text-center">
-              ยังไม่มีป้ายกำกับ (กดสร้างใหม่ด้านบนได้เลย)
-          </p>
-      {% endfor %}
-  </div>
+
+          <div x-show="taskMode === 'edit'" class="mt-6">
+    <div class="flex items-center gap-2 mb-3 pb-2 border-b-2 border-gray-100">
+        <span class="text-indigo-500 text-lg">📎</span>
+        <h4 class="font-bold text-gray-800 text-sm uppercase tracking-wide">ไฟล์แนบ (Attachments)</h4>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+        <template x-for="file in attachmentItems" :key="file.id">
+            <div class="group relative flex items-center gap-3 p-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-all">
+                
+                <div class="shrink-0 w-10 h-10 rounded bg-gray-200 flex items-center justify-center overflow-hidden">
+                    <template x-if="file.is_image">
+                        <img :src="file.url" class="w-full h-full object-cover" />
+                    </template>
+                    <template x-if="!file.is_image">
+                        <span class="text-gray-500 text-xs font-bold">FILE</span>
+                    </template>
+                </div>
+
+                <div class="min-w-0 flex-1">
+                    <a :href="file.url" target="_blank" class="block text-sm font-medium text-gray-700 truncate hover:text-indigo-600 hover:underline" x-text="file.filename"></a>
+                    <p class="text-[10px] text-gray-400" x-text="'เพิ่มเมื่อ ' + file.uploaded_at"></p>
+                </div>
+
+                <button 
+                    type="button"
+                    class="absolute top-2 right-2 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                    @click="
+                        if(confirm('ลบไฟล์นี้?')) {
+                            fetch(`/board/attachment/${file.id}/delete/`, {
+                                method: 'POST',
+                                headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+                            })
+                            .then(res => res.json())
+                            .then(data => {
+                                if(data.success) {
+                                    attachmentItems = attachmentItems.filter(f => f.id !== file.id);
+                                }
+                            })
+                        }
+                    "
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+        </template>
+    </div>
+
+    <div>
+        <label class="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-md transition-colors border border-gray-300 border-dashed">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            <span>อัปโหลดไฟล์...</span>
+            <input 
+                type="file" 
+                class="hidden" 
+                @change="
+                    if($event.target.files.length > 0) {
+                        const formData = new FormData();
+                        formData.append('file', $event.target.files[0]);
+                        
+                        fetch(`/board/task/${taskId}/attachment/create/`, {
+                            method: 'POST',
+                            headers: { 'X-CSRFToken': '{{ csrf_token }}' }, // ไม่ต้องใส่ Content-Type เมื่อส่ง FormData
+                            body: formData
+                        })
+                        .then(res => res.json())
+                        .then(data => {
+                            if(data.success) {
+                                attachmentItems.unshift({
+                                    id: data.id,
+                                    filename: data.filename,
+                                    url: data.url,
+                                    is_image: data.is_image,
+                                    uploaded_at: data.uploaded_at
+                                });
+                            } else {
+                                alert('เกิดข้อผิดพลาด: ' + (data.error || 'Unknown error'));
+                            }
+                            $event.target.value = ''; // เคลียร์ input
+                        })
+                    }
+                "
+            >
+        </label>
+    </div>
 </div>
 
-            <div class="pt-4 flex items-center gap-3">
+
+            {# --- SECTION 3: ตั้งค่า (Grid) --- #}
+          <div>
+              <div class="flex items-center gap-2 mb-3 pb-2 border-b-2 border-gray-100 mt-6">
+                  <span class="text-indigo-500 text-lg">⚙️</span>
+                  <h4 class="font-bold text-gray-800 text-sm uppercase tracking-wide">การตั้งค่า (Settings)</h4>
+              </div>
+
+              <div
+                class="bg-gray-50 rounded-xl p-4 border border-gray-100 grid grid-cols-1 sm:grid-cols-3 gap-4"
+              >
+              <div>
+                <label
+                  class="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wider"
+                  >ผู้รับผิดชอบ
+                </label>
+                    <div class="relative">
+                    <select
+                        name="assigned_to"
+                        x-model="taskAssignedTo"
+                        class="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white pl-3 pr-8 py-2"
+                    >
+                        <option value="">-- ไม่ระบุ --</option>
+                        {% for u in users %}
+                        <option value="{{ u.id }}">{{ u.username }}</option>
+                        {% endfor %}
+                    </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label
+                    class="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wider"
+                    >ความสำคัญ</label
+                    >
+                    <select
+                    name="priority"
+                    x-model="taskPriority"
+                    class="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white py-2"
+                    >
+                    {% for value, label in priority_choices %}
+                    <option value="{{ value }}">{{ label }}</option>
+                    {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label
+                    class="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wider"
+                    >กำหนดส่ง</label
+                    >
+                    <input
+                    type="datetime-local"
+                    name="due_date"
+                    x-model="taskDueDate"
+                    class="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white py-2 text-gray-600"
+                    />
+                </div>
+
+               {# --- SECTION 4: ป้ายกำกับ (อยู่ใน Grid) --- #}
+              <div 
+                class="col-span-1 sm:col-span-3 space-y-2 mt-4 pt-4 border-t border-gray-200"
+                x-data="{ showCreateLabel: false, newLabelName: '', newLabelColor: 'bg-blue-500' }"
+              >
+                <div class="flex justify-between items-center mb-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-indigo-500 text-base">🏷️</span>
+                        <label class="block text-sm font-bold text-gray-800 uppercase tracking-wide">ป้ายกำกับ (Labels)</label>
+                    </div>
+                    <button 
+                        type="button" 
+                        @click="showCreateLabel = !showCreateLabel" 
+                        class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 bg-indigo-50 px-2 py-1 rounded hover:bg-indigo-100 transition-colors"
+                    >
+                        <span x-text="showCreateLabel ? 'ยกเลิก' : '+ สร้างป้ายใหม่'"></span>
+                    </button>
+                </div>
+
+                <div>
+                    <div x-show="showCreateLabel" x-transition class="bg-white p-3 rounded-lg border border-gray-200 mb-3 space-y-3 shadow-sm">
+                        <div>
+                            <input type="text" x-model="newLabelName" placeholder="ชื่อป้าย (เช่น ด่วน, Bug)" 
+                                class="w-full text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 px-3 py-1.5 placeholder-gray-400">
+                        </div>
+                        
+                        <div>
+                            <div class="text-xs text-gray-500 mb-1">เลือกสี:</div>
+                            <div class="flex flex-wrap gap-2">
+                                <button type="button" @click="newLabelColor = 'bg-red-500'" :class="{'ring-2 ring-offset-2 ring-gray-400 scale-110': newLabelColor === 'bg-red-500'}" class="w-6 h-6 rounded-full bg-red-500 border border-white shadow-sm hover:scale-110 transition-all"></button>
+                                <button type="button" @click="newLabelColor = 'bg-orange-500'" :class="{'ring-2 ring-offset-2 ring-gray-400 scale-110': newLabelColor === 'bg-orange-500'}" class="w-6 h-6 rounded-full bg-orange-500 border border-white shadow-sm hover:scale-110 transition-all"></button>
+                                <button type="button" @click="newLabelColor = 'bg-yellow-400'" :class="{'ring-2 ring-offset-2 ring-gray-400 scale-110': newLabelColor === 'bg-yellow-400'}" class="w-6 h-6 rounded-full bg-yellow-400 border border-white shadow-sm hover:scale-110 transition-all"></button>
+                                <button type="button" @click="newLabelColor = 'bg-green-500'" :class="{'ring-2 ring-offset-2 ring-gray-400 scale-110': newLabelColor === 'bg-green-500'}" class="w-6 h-6 rounded-full bg-green-500 border border-white shadow-sm hover:scale-110 transition-all"></button>
+                                <button type="button" @click="newLabelColor = 'bg-blue-500'" :class="{'ring-2 ring-offset-2 ring-gray-400 scale-110': newLabelColor === 'bg-blue-500'}" class="w-6 h-6 rounded-full bg-blue-500 border border-white shadow-sm hover:scale-110 transition-all"></button>
+                                <button type="button" @click="newLabelColor = 'bg-indigo-500'" :class="{'ring-2 ring-offset-2 ring-gray-400 scale-110': newLabelColor === 'bg-indigo-500'}" class="w-6 h-6 rounded-full bg-indigo-500 border border-white shadow-sm hover:scale-110 transition-all"></button>
+                                <button type="button" @click="newLabelColor = 'bg-pink-500'" :class="{'ring-2 ring-offset-2 ring-gray-400 scale-110': newLabelColor === 'bg-pink-500'}" class="w-6 h-6 rounded-full bg-pink-500 border border-white shadow-sm hover:scale-110 transition-all"></button>
+                                <button type="button" @click="newLabelColor = 'bg-gray-500'" :class="{'ring-2 ring-offset-2 ring-gray-400 scale-110': newLabelColor === 'bg-gray-500'}" class="w-6 h-6 rounded-full bg-gray-500 border border-white shadow-sm hover:scale-110 transition-all"></button>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2 p-2 bg-gray-50 rounded border border-gray-100">
+                            <span class="text-xs text-gray-400">ตัวอย่าง:</span>
+                            <div 
+                                class="px-3 py-1 rounded-full text-xs font-medium text-white shadow-sm transition-all"
+                                :class="newLabelColor"
+                            >
+                                <span x-text="newLabelName || 'ชื่อป้ายกำกับ'"></span>
+                            </div>
+                        </div>
+
+                        <button type="button" 
+                            @click="
+                                if(!newLabelName) return;
+                                fetch('{% url 'create_label' board.id %}', {
+                                    method: 'POST',
+                                    headers: { 
+                                        'Content-Type': 'application/json',
+                                        'X-CSRFToken': '{{ csrf_token }}'
+                                    },
+                                    body: JSON.stringify({ name: newLabelName, color: newLabelColor })
+                                })
+                                .then(res => res.json())
+                                .then(data => {
+                                    if(data.success) {
+                                        const container = document.getElementById('label-container');
+                                        const html = `
+                                        <label class='cursor-pointer relative group'>
+                                            <input type='checkbox' name='labels' value='${data.id}' class='peer sr-only' checked>
+                                            <div class='px-3 py-1 rounded-full text-xs font-medium text-white opacity-40 hover:opacity-100 peer-checked:opacity-100 peer-checked:ring-2 peer-checked:ring-offset-1 peer-checked:ring-gray-400 transition-all ${data.color} shadow-sm'>
+                                                ${data.name}
+                                            </div>
+                                            <svg class='h-3 w-3 absolute -top-1 -right-1 text-green-600 bg-white rounded-full block shadow-sm' viewBox='0 0 20 20' fill='currentColor'><path fill-rule='evenodd' d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z' clip-rule='evenodd' /></svg>
+                                        </label>`;
+                                        container.insertAdjacentHTML('beforeend', html);
+                                        
+                                        const noLabelText = document.getElementById('no-label-text');
+                                        if(noLabelText) noLabelText.style.display = 'none';
+
+                                        newLabelName = '';
+                                        showCreateLabel = false;
+                                        if(typeof taskLabels !== 'undefined') taskLabels.push(data.id);
+                                    }
+                                })
+                            "
+                            class="w-full bg-indigo-600 text-white text-xs font-bold py-1.5 rounded-md hover:bg-indigo-700 transition shadow-sm"
+                        >
+                            บันทึกป้ายใหม่
+                        </button>
+                    </div>
+
+                    <div id="label-container" class="flex flex-wrap gap-2 min-h-[30px]">
+                        {% for label in labels %}
+                        <label class="cursor-pointer relative group">
+                            <input 
+                                type="checkbox" 
+                                name="labels" 
+                                value="{{ label.id }}" 
+                                class="peer sr-only"
+                                x-model="taskLabels"
+                            >
+                            <div class="px-3 py-1 rounded-full text-xs font-medium text-white opacity-40 hover:opacity-100 peer-checked:opacity-100 peer-checked:ring-2 peer-checked:ring-offset-1 peer-checked:ring-gray-400 transition-all {{ label.color }} shadow-sm">
+                                {{ label.name }}
+                            </div>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 absolute -top-1 -right-1 text-green-600 bg-white rounded-full hidden peer-checked:block shadow-sm z-10" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                            </svg>
+                        </label>
+                        {% empty %}
+                            <p id="no-label-text" class="text-xs text-gray-400 bg-white/50 p-2 rounded border border-dashed border-gray-300 w-full text-center">
+                                ยังไม่มีป้ายกำกับ
+                            </p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="pt-4 flex items-center gap-3 border-t border-gray-100 mt-6">
               <button
                 type="submit"
                 class="flex-1 sm:flex-none px-6 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
@@ -284,13 +517,13 @@
         </div>
 
         {# ฝั่งขวา: COMMENTS #}
-        <div class="hidden lg:flex flex-col h-full space-y-4">
-          <div
+      <div class="hidden lg:flex flex-col h-10 space-y-4">
+        <div
             class="bg-gray-50 rounded-xl border border-gray-200 p-4 flex-1 flex flex-col max-h-[500px]"
-          >
-            <h4
+        >
+          <h4
               class="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2"
-            >
+          >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 class="h-4 w-4"

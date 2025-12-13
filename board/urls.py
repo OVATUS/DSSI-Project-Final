@@ -21,7 +21,16 @@ urlpatterns = [
     path("<int:board_id>/list/create/", list_create, name="list_create"),
     path("list/<int:list_id>/edit/", list_update, name="list_update"),
     path("list/<int:list_id>/delete/", list_delete, name="list_delete"),
-     path("<int:board_id>/list/reorder/", list_reorder, name="list_reorder"),
+    path("<int:board_id>/list/reorder/", list_reorder, name="list_reorder"),
+
+    # Checklist URLs
+    path('task/<int:task_id>/checklist/create/', create_checklist_item, name='create_checklist_item'),
+    path('checklist/<int:item_id>/update/', update_checklist_item_status, name='update_checklist_item_status'),
+    path('checklist/<int:item_id>/delete/', delete_checklist_item, name='delete_checklist_item'),
+
+    # Attachment URLs
+    path('task/<int:task_id>/attachment/create/', create_attachment, name='create_attachment'),
+    path('attachment/<int:attachment_id>/delete/', delete_attachment, name='delete_attachment'),
 
      # Task 🆕
     path("task/create/<int:list_id>/", task_create, name="task_create"),

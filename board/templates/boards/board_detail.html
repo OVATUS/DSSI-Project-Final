@@ -215,6 +215,7 @@
                     @click="
                         taskMode = 'edit';
                         taskModalOpen = true;
+                        taskId = {{ task.id }}; 
                         taskListTitle = '{{ lst.title|escapejs }}';
                         taskActionUrl = '{% url 'task_update' task.id %}';
                         taskTitle = '{{ task.title|escapejs }}';
@@ -223,14 +224,33 @@
                         taskPriority = '{{ task.priority }}';
                         taskDueDate = '{{ task.due_date|date:'Y-m-d\TH:i' }}';
                         taskLabels = [{% for label in task.labels.all %}{{ label.id }}{% if not forloop.last %},{% endif %}{% endfor %}];
+
+                        checklistItems = [
+                        {% for item in task.checklist_items.all %}
+                        { 
+                          id: {{ item.id }}, 
+                          content: '{{ item.content|escapejs }}', 
+                          is_completed: {% if item.is_completed %}true{% else %}false{% endif %} 
+                        },
+                        {% endfor %}
+                        ];
+                        attachmentItems = [
+            {% for att in task.attachments.all %}
+            {
+                id: {{ att.id }},
+                filename: '{{ att.filename|escapejs }}',
+                url: '{{ att.file.url|escapejs }}',
+                is_image: {% if att.is_image %}true{% else %}false{% endif %},
+                uploaded_at: '{{ att.uploaded_at|date:"d/m/Y H:i" }}'
+            },
+            {% endfor %}
+        ];
                     "
                 >
                     {% include "boards/components/task_card.html" with task=task lst=lst %}
                 </div>
                 {% empty %}
-                <div class="h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center text-gray-400 text-xs">
-                    ลากการ์ดมาวางที่นี่
-                </div>
+                
                 {% endfor %}
             </div>
 

@@ -1,8 +1,8 @@
 from django.db import models
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
-from .models import Board, List, Task, Comment , Label , BoardInvitation
-from .forms import BoardForm, ListForm, TaskForm
+from .models import Board, List, Task, Comment , Label , BoardInvitation , ChecklistItem, Attachment
+from .forms import BoardForm, ListForm, TaskForm  
 from users.models import User
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
@@ -111,17 +111,13 @@ def board_detail(request, board_id):
         Q(created_by=request.user) | Q(members=request.user),
         id=board_id
     )
-
     # ... (code ส่วนดึง lists, tasks เหมือนเดิม)
     lists = board.lists.all().prefetch_related("tasks").order_by("position")
     
-    # ✅ ส่ง members ทั้งหมดไปที่ template ด้วย (เผื่อใช้แสดงรูปคนในบอร์ด)
-    # เราจะรวมเจ้าของบอร์ด + สมาชิก
-    # (หรือถ้าจะเอาแค่รายชื่อ user ทั้งหมดในระบบเพื่อให้เลือกมอบหมายงาน ก็ใช้ User.objects.all() เหมือนเดิมได้ครับ 
-    # แต่ปกติควรให้เลือก assign ได้เฉพาะคนในบอร์ดนะ)
     
-    # ตัวอย่าง: เอา User ทั้งหมดในระบบมาแสดงใน Dropdown (แบบเดิมของคุณ)
-    users = User.objects.all() 
+    users = User.objects.filter(
+        Q(id=board.created_by.id) | Q(joined_boards=board)
+    ).distinct()
     
     priority_choices = Task.Priority.choices
 
@@ -513,3 +509,81 @@ def respond_invitation(request, invite_id, action):
         invite.save()
         
     return redirect('project_page') # หรือหน้า inbox ที่เราจะสร้าง
+
+@login_required
+@require_POST
+def create_checklist_item(request, task_id):
+    task = get_object_or_404(Task, id=task_id)
+    
+    # ตรวจสอบสิทธิ์ (ถ้าจำเป็น): เช่น user ต้องอยู่ใน board นี้
+    
+    try:
+        data = json.loads(request.body)
+        content = data.get('content')
+        
+        if content:
+            item = ChecklistItem.objects.create(task=task, content=content)
+            return JsonResponse({
+                'success': True,
+                'id': item.id,
+                'content': item.content,
+                'is_completed': item.is_completed
+            })
+        return JsonResponse({'success': False, 'error': 'No content provided'}, status=400)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+@login_required
+@require_POST
+def update_checklist_item_status(request, item_id):
+    item = get_object_or_404(ChecklistItem, id=item_id)
+    
+    try:
+        data = json.loads(request.body)
+        is_completed = data.get('is_completed', False)
+        
+        item.is_completed = is_completed
+        item.save()
+        
+        return JsonResponse({'success': True, 'is_completed': item.is_completed})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+@login_required
+@require_POST
+def delete_checklist_item(request, item_id):
+    item = get_object_or_404(ChecklistItem, id=item_id)
+    item.delete()
+    return JsonResponse({'success': True})
+
+
+# --- Attachment Views ---
+@login_required
+@require_POST
+def create_attachment(request, task_id):
+    task = get_object_or_404(Task, id=task_id)
+    
+    # รับไฟล์จาก request.FILES
+    if 'file' in request.FILES:
+        file = request.FILES['file']
+        attachment = Attachment.objects.create(task=task, file=file)
+        
+        return JsonResponse({
+            'success': True,
+            'id': attachment.id,
+            'filename': attachment.filename(),
+            'url': attachment.file.url,
+            'is_image': attachment.is_image(),
+            'uploaded_at': attachment.uploaded_at.strftime('%d/%m/%Y %H:%M')
+        })
+        
+    return JsonResponse({'success': False, 'error': 'No file uploaded'}, status=400)
+
+@login_required
+@require_POST
+def delete_attachment(request, attachment_id):
+    attachment = get_object_or_404(Attachment, id=attachment_id)
+    attachment.delete()
+    # หมายเหตุ: ปกติ Django จะลบ record ใน DB แต่ไฟล์จริงอาจจะยังอยู่
+    # ถ้าอยากให้ลบไฟล์จริงด้วย ต้องใช้ signal หรือ library เสริม (แต่เบื้องต้นแค่นี้ก่อนได้ครับ)
+    return JsonResponse({'success': True})

@@ -62,6 +62,11 @@ window.boardDetailPage = function (config) {
         listDeleteOpen: false,
         listDeleteActionUrl: '',
 
+        checklistItems: [],
+        newChecklistItem: '',
+        attachmentItems: [],
+        taskId: null,
+
         // ==== Drag & Drop State ====
         draggingTaskId: null,
         draggingListId: null,
