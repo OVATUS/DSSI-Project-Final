@@ -2,6 +2,8 @@ from django.db import models
 from users.models import User
 from django.conf import settings
 import os
+from django.utils import timezone  
+from datetime import timedelta
 
 COLOR_CHOICES = [
     ('bg-red-500', 'สีแดง (Red)'),
@@ -71,14 +73,13 @@ class Task(models.Model):
         LOW = "low", "Low"
         MEDIUM = "medium", "Medium"
         HIGH = "high", "High"
-
-    list = models.ForeignKey(List, on_delete=models.CASCADE, related_name="tasks")  # list_id
+ 
+    list = models.ForeignKey('List', on_delete=models.CASCADE, related_name="tasks") 
+    
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     position = models.IntegerField(default=0)
-   
-
-    # ผู้รับผิดชอบงาน (nullable)
+    
     assigned_to = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -101,12 +102,38 @@ class Task(models.Model):
         default=Priority.MEDIUM,
     )
 
+    
     created_at = models.DateTimeField(auto_now_add=True)
-    labels = models.ManyToManyField(Label, blank=True, related_name='tasks')
+    
+   
+    labels = models.ManyToManyField('Label', blank=True, related_name='tasks')
+
+    # ---------------- META & METHODS ----------------
+
     class Meta:
         ordering = ['position']
+
     def __str__(self):
         return f"{self.title} ({self.get_status_display()})"
+
+    
+    @property
+    def due_status(self):
+        if not self.due_date:
+            return 'no_date'
+            
+        now = timezone.now()
+        
+        # กรณีเลยกำหนดแล้ว (Overdue)
+        if self.due_date < now:
+            return 'overdue'
+            
+        # กรณีเหลือเวลาน้อยกว่า 24 ชม. (Due Soon)
+        elif self.due_date < now + timedelta(days=1):
+            return 'soon'
+            
+        return 'future'
+
 
 class Comment(models.Model):
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='comments')
@@ -154,3 +181,18 @@ class Attachment(models.Model):
     def is_image(self):
         name = self.filename().lower()
         return name.endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp'))
+
+
+class Notification(models.Model):
+    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications') # ผู้รับแจ้งเตือน
+    actor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='triggered_notifications') # ผู้กระทำ (เช่น คนที่ assign)
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='notifications') # งานที่เกี่ยวข้อง
+    message = models.CharField(max_length=255) # ข้อความแจ้งเตือน
+    is_read = models.BooleanField(default=False) # อ่านหรือยัง
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at'] # ใหม่สุดขึ้นก่อน
+
+    def __str__(self):
+        return f"{self.actor.username} -> {self.recipient.username}: {self.message}"

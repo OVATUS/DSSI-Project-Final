@@ -1,136 +1,204 @@
-{# board/templates/boards/dashboard.html #}
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="p-6 md:p-10 max-w-6xl mx-auto space-y-8">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
 
-    {# --- Header --- #}
+    {# ================================================= #}
+    {# 1. กล่องจดหมาย / คำเชิญ (Invitations Box)         #}
+    {# ================================================= #}
+    {% if received_invites %}
+    <div class="bg-white rounded-xl shadow-md border-l-4 border-indigo-500 overflow-hidden">
+        <div class="p-4 bg-indigo-50 border-b border-indigo-100 flex justify-between items-center">
+            <h3 class="text-indigo-900 font-bold flex items-center gap-2">
+                📩 คำเชิญเข้าร่วมโปรเจกต์ใหม่ ({{ received_invites.count }})
+            </h3>
+        </div>
+        <div class="divide-y divide-gray-100">
+            {% for invite in received_invites %}
+            <div class="p-4 flex flex-col sm:flex-row justify-between items-center gap-4 hover:bg-gray-50 transition-colors">
+                <div class="flex items-center gap-3">
+                    {# Avatar คนเชิญ #}
+                    <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
+                        {{ invite.sender.username.0|upper }}
+                    </div>
+                    <div>
+                        <p class="text-gray-800 text-sm">
+                            <span class="font-bold">{{ invite.sender.username }}</span> เชิญคุณเข้าร่วม
+                        </p>
+                        <p class="text-indigo-600 font-bold text-lg leading-tight">
+                            "{{ invite.board.name }}"
+                        </p>
+                    </div>
+                </div>
+                <div class="flex gap-2 w-full sm:w-auto">
+                    <a href="{% url 'respond_invitation' invite.id 'accept' %}" class="flex-1 sm:flex-none text-center bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 shadow-sm transition-all">
+                        ตอบรับ
+                    </a>
+                    <a href="{% url 'respond_invitation' invite.id 'decline' %}" class="flex-1 sm:flex-none text-center bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 hover:text-red-600 transition-all">
+                        ปฏิเสธ
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+
+    {# ================================================= #}
+    {# 2. สรุปงานของฉัน (Task Summary) + ตัวกรอง        #}
+    {# ================================================= #}
+    {# ใช้ Alpine.js (x-data) เพื่อทำ Tab Filter #}
+    <div x-data="{ filter: 'all' }"> <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+            <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+                <span>⚡</span> งานของฉัน (My Tasks)
+            </h2>
+            
+            {# ปุ่มตัวกรอง (Filter Tabs) #}
+            <div class="bg-gray-100 p-1 rounded-lg inline-flex self-start sm:self-auto">
+                <button 
+                    @click="filter = 'all'" 
+                    :class="filter === 'all' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
+                    class="px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2"
+                >
+                    ทั้งหมด <span class="bg-gray-200 text-gray-600 px-1.5 rounded-full text-[10px]">{{ counts.all }}</span>
+                </button>
+
+                <button 
+                    @click="filter = 'week'" 
+                    :class="filter === 'week' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
+                    class="px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2"
+                >
+                    Week นี้ <span class="bg-orange-100 text-orange-600 px-1.5 rounded-full text-[10px]">{{ counts.week }}</span>
+                </button>
+
+                <button 
+                    @click="filter = 'overdue'" 
+                    :class="filter === 'overdue' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
+                    class="px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2"
+                >
+                    เลยกำหนด <span class="bg-red-100 text-red-600 px-1.5 rounded-full text-[10px]">{{ counts.overdue }}</span>
+                </button>
+            </div>
+        </div>
+
+        {# ตารางงาน #}
+        <div class="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-200">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ชื่องาน</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">โปรเจกต์</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">สถานะ</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">กำหนดส่ง</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for item in task_list_data %}
+                        {# ใช้ x-show กรองแถวตามสถานะ #}
+                        <tr 
+                            x-show="(filter === 'all') || (filter === 'overdue' && {{ item.is_overdue|yesno:'true,false' }}) || (filter === 'week' && {{ item.is_week|yesno:'true,false' }})"
+                            class="hover:bg-gray-50 transition-colors cursor-pointer" 
+                            onclick="window.location.href='{% url 'board_detail' item.obj.list.board.id %}'"
+                        >
+                            <td class="px-6 py-4">
+                                <div class="text-sm font-bold text-gray-800">{{ item.obj.title }}</div>
+                                {% if item.obj.priority == 'high' %}
+                                    <span class="text-[10px] text-red-600 font-bold bg-red-50 px-1 rounded">High Priority</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="text-xs text-gray-500">
+                                    🏠 {{ item.obj.list.board.name }}
+                                    <span class="mx-1">/</span>
+                                    {{ item.obj.list.title }}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <span class="px-2 py-0.5 inline-flex text-xs font-semibold rounded-full 
+                                    {% if item.obj.status == 'todo' %}bg-gray-100 text-gray-600
+                                    {% elif item.obj.status == 'in_progress' %}bg-blue-100 text-blue-600
+                                    {% endif %}">
+                                    {{ item.obj.get_status_display }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4">
+                                {% if item.obj.due_date %}
+                                    <div class="flex items-center gap-2 text-sm">
+                                        {# แสดงวันที่ + สีตามสถานะ #}
+                                        {% if item.is_overdue %}
+                                            <span class="text-red-600 font-bold flex items-center gap-1">
+                                                ⚠️ {{ item.obj.due_date|date:"d M" }}
+                                            </span>
+                                        {% elif item.is_week %}
+                                            <span class="text-orange-500 font-medium flex items-center gap-1">
+                                                🕒 {{ item.obj.due_date|date:"d M" }}
+                                            </span>
+                                        {% else %}
+                                            <span class="text-gray-500">
+                                                {{ item.obj.due_date|date:"d M" }}
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                {% else %}
+                                    <span class="text-gray-300">-</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="px-6 py-8 text-center text-gray-400">
+                                ไม่มีงานค้างในขณะนี้ 🎉
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                
+                {# ข้อความเมื่อกด Filter แล้วไม่เจอข้อมูล (Optional) #}
+                <div x-show="filter === 'overdue' && {{ counts.overdue }} === 0" class="p-8 text-center text-gray-400 bg-white hidden" :class="{'block': true, 'hidden': false}">
+                    👍 ไม่มีงานที่เลยกำหนด
+                </div>
+                 <div x-show="filter === 'week' && {{ counts.week }} === 0" class="p-8 text-center text-gray-400 bg-white hidden" :class="{'block': true, 'hidden': false}">
+                    📅 ไม่มีงานที่ต้องส่งในสัปดาห์นี้
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    {# ================================================= #}
+    {# 3. รายการบอร์ด (Your Boards) - เหมือนเดิม        #}
+    {# ================================================= #}
     <div>
-        <h1 class="text-3xl font-extrabold text-gray-800">Dashboard</h1>
-        <p class="text-gray-500 mt-1">จัดการคำเชิญและสถานะโปรเจกต์ของคุณ</p>
-    </div>
-
-    {# --- Grid Layout --- #}
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-
-        {# ========================================== #}
-        {#  BOX 1: คำเชิญถึงฉัน (Invitations Received)  #}
-        {# ========================================== #}
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-            <div class="px-6 py-4 bg-indigo-50 border-b border-indigo-100 flex items-center justify-between">
-                <h2 class="text-lg font-bold text-indigo-900 flex items-center gap-2">
-                    📥 คำเชิญถึงฉัน
-                    {% if received_invites %}
-                        <span class="bg-indigo-600 text-white text-xs px-2 py-0.5 rounded-full">{{ received_invites.count }}</span>
-                    {% endif %}
-                </h2>
-            </div>
-            
-            <div class="divide-y divide-gray-100">
-                {% for invite in received_invites %}
-                    <div class="p-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between hover:bg-gray-50 transition-colors">
-                        {# ข้อมูลคนเชิญ #}
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-lg border-2 border-white shadow-sm">
-                                {% if invite.sender.profile_image %}
-                                    <img src="{{ invite.sender.profile_image.url }}" class="w-full h-full rounded-full object-cover">
-                                {% else %}
-                                    {{ invite.sender.username|slice:":1"|upper }}
-                                {% endif %}
-                            </div>
-                            <div>
-                                <p class="text-gray-900 font-medium">
-                                    <span class="font-bold text-indigo-600">{{ invite.sender.username }}</span> เชิญคุณเข้าร่วม
-                                </p>
-                                <p class="text-sm text-gray-500">
-                                    โปรเจกต์: <span class="font-semibold text-gray-700">"{{ invite.board.name }}"</span>
-                                </p>
-                                <p class="text-xs text-gray-400 mt-1">{{ invite.created_at|date:"d M Y H:i" }}</p>
-                            </div>
-                        </div>
-
-                        {# ปุ่ม Action #}
-                        <div class="flex gap-2 w-full sm:w-auto">
-                            <a href="{% url 'respond_invitation' invite.id 'accept' %}" class="flex-1 sm:flex-none bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-all text-center">
-                                ยอมรับ
-                            </a>
-                            <a href="{% url 'respond_invitation' invite.id 'decline' %}" class="flex-1 sm:flex-none bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-semibold transition-all text-center">
-                                ปฏิเสธ
-                            </a>
-                        </div>
-                    </div>
-                {% empty %}
-                    <div class="p-8 text-center text-gray-400 flex flex-col items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-3 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                        </svg>
-                        <p>ไม่มีคำเชิญใหม่ในขณะนี้</p>
-                    </div>
-                {% endfor %}
-            </div>
+        <div class="flex justify-between items-center mb-4 mt-8">
+            <h2 class="text-xl font-bold text-gray-800">📋 โปรเจกต์ทั้งหมด</h2>
+            <a href="{% url 'board_create' %}" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm font-medium shadow-sm transition-colors">
+                + สร้างบอร์ด
+            </a>
         </div>
-
-
-        {# ========================================== #}
-        {#  BOX 2: คำเชิญที่ส่งไป (Pending Sent)        #}
-        {# ========================================== #}
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-            <div class="px-6 py-4 bg-orange-50 border-b border-orange-100 flex items-center justify-between">
-                <h2 class="text-lg font-bold text-orange-900 flex items-center gap-2">
-                    ⏳ รอการตอบรับ
-                    {% if sent_invites %}
-                        <span class="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full">{{ sent_invites.count }}</span>
-                    {% endif %}
-                </h2>
-            </div>
-            
-            <div class="divide-y divide-gray-100">
-                {% for invite in sent_invites %}
-                    <div class="p-6 flex items-center justify-between hover:bg-gray-50 transition-colors">
-                        <div class="flex items-center gap-3">
-                             <div class="w-10 h-10 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center font-bold text-lg border-2 border-white shadow-sm">
-                                {% if invite.recipient.profile_image %}
-                                    <img src="{{ invite.recipient.profile_image.url }}" class="w-full h-full rounded-full object-cover">
-                                {% else %}
-                                    {{ invite.recipient.username|slice:":1"|upper }}
-                                {% endif %}
-                            </div>
-                            <div>
-                                <p class="text-gray-900 font-medium">
-                                    คุณเชิญ <span class="font-bold text-orange-600">{{ invite.recipient.username }}</span>
-                                </p>
-                                <p class="text-sm text-gray-500">
-                                    เข้าร่วม: <span class="font-semibold text-gray-700">{{ invite.board.name }}</span>
-                                </p>
-                                <p class="text-xs text-gray-400 mt-1">ส่งเมื่อ: {{ invite.created_at|date:"d M Y" }}</p>
-                            </div>
-                        </div>
-                        
-                        <span class="text-xs font-semibold px-2.5 py-1 bg-yellow-100 text-yellow-700 rounded-full">
-                            รอการตอบกลับ
-                        </span>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for board in boards %}
+            <a href="{% url 'board_detail' board.id %}" class="block group">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md hover:border-indigo-300 transition-all h-full flex flex-col">
+                    <h3 class="text-lg font-bold text-gray-800 mb-2 group-hover:text-indigo-600 transition-colors">{{ board.name }}</h3>
+                    <p class="text-gray-500 text-sm mb-4 flex-1">{{ board.description|default:"-"|truncatechars:50 }}</p>
+                    <div class="flex items-center justify-between text-xs text-gray-400 mt-auto pt-4 border-t border-gray-100">
+                        <span>Updated: {{ board.created_at|date:"d M" }}</span>
+                        {% if board.members.count > 0 %}
+                        <span class="bg-gray-100 px-2 py-1 rounded-full">👥 {{ board.members.count }}</span>
+                        {% endif %}
                     </div>
-                {% empty %}
-                     <div class="p-8 text-center text-gray-400 flex flex-col items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-3 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                        </svg>
-                        <p>ไม่มีรายการที่รอการตอบรับ</p>
-                    </div>
-                {% endfor %}
+                </div>
+            </a>
+            {% empty %}
+            <div class="col-span-full text-center py-12 bg-white rounded-xl border border-dashed border-gray-300">
+                <p class="text-gray-500">คุณยังไม่มีบอร์ด เริ่มต้นสร้างบอร์ดแรกกันเลย!</p>
             </div>
+            {% endfor %}
         </div>
-
-    </div>
-
-    {# ปุ่มทางลัดไปหน้า Projects #}
-    <div class="flex justify-center pt-4">
-        <a href="{% url 'project_page' %}" class="flex items-center gap-2 text-indigo-600 font-semibold hover:text-indigo-800 hover:underline transition">
-            <span>ไปที่หน้าโปรเจกต์ทั้งหมด</span>
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-            </svg>
-        </a>
     </div>
 
 </div>

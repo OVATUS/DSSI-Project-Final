@@ -1,22 +1,156 @@
-<header class="fixed top-0 left-0 w-full h-14 z-35 bg-[#0094FF] text-white flex items-center justify-between px-6 shadow-md">
-    <div class="text-2xl font-extrabold tracking-wider">
-        <a href="{% url 'home' %}">
-            WORK WAI D
-        </a>
-    </div>
+<header
+  class="fixed top-0 left-0 w-full h-14 z-35 bg-[#0094FF] text-white flex items-center justify-between px-6 shadow-md"
+>
+  <div class="text-2xl font-extrabold tracking-wider">
+    <a href="{% url 'home' %}"> WORK WAI D </a>
+  </div>
 
-    <div class="flex items-center gap-3">
-        <span class="text-sm font-semibold uppercase">{{ request.user.username }}</span>
-        <div class="w-8 h-8 rounded-full bg-white overflow-hidden border border-white">
-             <a href="{% url 'profile' %}" class="block w-full h-full">
-                {% if request.user.profile_image %}
-                    <img src="{{ request.user.profile_image.url }}" class="w-full h-full object-cover">
-                {% else %}
-                    <div class="w-full h-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">
-                        {{ request.user.username|slice:":1"|upper }}
-                    </div>
-                {% endif %}
-            </a>
+  <div class="flex items-center gap-3">
+    <div
+      class="relative mr-4"
+      x-data="{ 
+        open: false, 
+        count: 0, 
+        notifications: [],
+        fetchNotifications() {
+            fetch('{% url 'get_notifications' %}')
+                .then(res => res.json())
+                .then(data => {
+                    this.count = data.unread_count;
+                    this.notifications = data.notifications;
+                });
+        },
+        markAsRead(id, boardId) {
+             fetch(`/board/notifications/${id}/read/`, { 
+                 method: 'POST', 
+                 headers: {'X-CSRFToken': '{{ csrf_token }}'} 
+             }).then(() => {
+                 // เมื่อกดอ่าน ให้ redirect ไปที่หน้าบอร์ดนั้น
+                 window.location.href = `/board/${boardId}/`;
+             });
+        }
+    }"
+      x-init="fetchNotifications(); setInterval(() => fetchNotifications(), 10000)"
+      @click.outside="open = false"
+    >
+      <button
+        @click="open = !open"
+        class="relative p-2 text-white hover:bg-white/10 rounded-full transition-colors"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-6 w-6"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+          />
+        </svg>
+
+        <span
+          x-show="count > 0"
+          x-text="count"
+          class="absolute top-1 right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-[#0094FF]"
+        ></span>
+      </button>
+
+      <div
+        x-show="open"
+        x-transition
+        class="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50 text-gray-800"
+        style="display: none"
+      >
+        <div
+          class="p-3 border-b border-gray-100 flex justify-between items-center bg-gray-50"
+        >
+          <h3 class="font-bold text-sm text-gray-700">การแจ้งเตือน</h3>
+          <button
+            @click="
+                fetch('{% url 'mark_all_read' %}', { method: 'POST', headers: {'X-CSRFToken': '{{ csrf_token }}'} })
+                .then(() => { count = 0; fetchNotifications(); })
+            "
+            class="text-xs text-indigo-600 hover:underline"
+          >
+            อ่านทั้งหมด
+          </button>
         </div>
+
+        <div class="max-h-80 overflow-y-auto">
+          <template x-for="notif in notifications" :key="notif.id">
+            <div
+              @click="markAsRead(notif.id, notif.board_id)"
+              class="p-3 border-b border-gray-50 hover:bg-indigo-50 cursor-pointer transition-colors flex gap-3 items-start"
+              :class="{'bg-blue-50/50': !notif.is_read}"
+            >
+              <div
+                class="w-8 h-8 rounded-full bg-gray-200 overflow-hidden shrink-0"
+              >
+                <template x-if="notif.actor_avatar">
+                  <img
+                    :src="notif.actor_avatar"
+                    class="w-full h-full object-cover"
+                  />
+                </template>
+                <template x-if="!notif.actor_avatar">
+                  <div
+                    class="w-full h-full bg-indigo-500 flex items-center justify-center text-white text-xs font-bold"
+                    x-text="notif.actor.charAt(0)"
+                  ></div>
+                </template>
+              </div>
+
+              <div class="flex-1">
+                <p class="text-sm">
+                  <span class="font-bold" x-text="notif.actor"></span>
+                  <span x-text="notif.message"></span>
+                </p>
+                <p
+                  class="text-[10px] text-gray-400 mt-1"
+                  x-text="notif.created_at"
+                ></p>
+              </div>
+
+              <div
+                x-show="!notif.is_read"
+                class="w-2 h-2 rounded-full bg-blue-500 mt-2"
+              ></div>
+            </div>
+          </template>
+
+          <div
+            x-show="notifications.length === 0"
+            class="p-4 text-center text-gray-400 text-sm"
+          >
+            ไม่มีการแจ้งเตือน
+          </div>
+        </div>
+      </div>
     </div>
+    <span class="text-sm font-semibold uppercase"
+      >{{ request.user.username }}</span
+    >
+    <div
+      class="w-8 h-8 rounded-full bg-white overflow-hidden border border-white"
+    >
+      <a href="{% url 'profile' %}" class="block w-full h-full">
+        {% if request.user.profile_image %}
+        <img
+          src="{{ request.user.profile_image.url }}"
+          class="w-full h-full object-cover"
+        />
+        {% else %}
+        <div
+          class="w-full h-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold"
+        >
+          {{ request.user.username|slice:":1"|upper }}
+        </div>
+        {% endif %}
+      </a>
+    </div>
+  </div>
 </header>

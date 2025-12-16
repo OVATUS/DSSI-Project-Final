@@ -1,7 +1,7 @@
 from django.db import models
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
-from .models import Board, List, Task, Comment , Label , BoardInvitation , ChecklistItem, Attachment
+from .models import Board, List, Task, Comment , Label , BoardInvitation , ChecklistItem, Attachment, Notification
 from .forms import BoardForm, ListForm, TaskForm  
 from users.models import User
 from django.http import JsonResponse
@@ -9,25 +9,70 @@ from django.views.decorators.http import require_POST
 from django.db.models import Max
 from django.db.models import Q
 import json
+from django.utils import timezone
+from datetime import timedelta
 
 @login_required
 def board_lsit_view(request):
-    # 1. คำเชิญถึงฉัน (คนอื่นเชิญเรา)
+    # --- 1. ส่วนคำเชิญ (Invitations) ---
     received_invites = BoardInvitation.objects.filter(
         recipient=request.user, 
         status='pending'
     ).select_related('sender', 'board')
 
-    # 2. คำเชิญที่เราส่งไป (เราเชิญคนอื่น แล้วเขายังไม่ตอบ)
-    sent_invites = BoardInvitation.objects.filter(
-        sender=request.user, 
-        status='pending'
-    ).select_related('recipient', 'board')
+    # --- 2. ส่วนบอร์ด (Boards) ---
+    boards = Board.objects.filter(
+        Q(created_by=request.user) | Q(members=request.user)
+    ).distinct()
+
+    # --- 3. ส่วนงานของฉัน (My Tasks) พร้อม Logic ตัวกรอง ---
+    # ดึงงานที่ยังไม่เสร็จทั้งหมด (ไม่จำกัดแค่ 10 อันแล้ว เพราะต้องเอามาทำ Filter)
+    all_tasks = Task.objects.filter(
+        assigned_to=request.user
+    ).exclude(
+        status='done'
+    ).select_related('list__board').order_by('due_date', '-priority')
+
+    now = timezone.now()
+    next_week = now + timedelta(days=7)
+    
+    # เตรียมข้อมูลสำหรับส่งไปหน้าเว็บ (เพื่อให้ Filter ง่าย)
+    task_list_data = []
+    
+    # ตัวนับจำนวนงาน (Counters)
+    counts = {
+        'all': all_tasks.count(),
+        'overdue': 0,
+        'week': 0
+    }
+
+    for task in all_tasks:
+        is_overdue = False
+        is_week = False
+
+        if task.due_date:
+            # เช็คว่าเลยกำหนดไหม
+            if task.due_date < now:
+                is_overdue = True
+                counts['overdue'] += 1
+            # เช็คว่าอยู่ในสัปดาห์นี้ไหม (ภายใน 7 วันข้างหน้า)
+            elif task.due_date <= next_week:
+                is_week = True
+                counts['week'] += 1
+        
+        task_list_data.append({
+            'obj': task,          # ตัว Object Task จริงๆ
+            'is_overdue': is_overdue,
+            'is_week': is_week
+        })
 
     context = {
         'received_invites': received_invites,
-        'sent_invites': sent_invites,
+        'boards': boards,
+        'task_list_data': task_list_data, # ส่งไปแบบ List ที่มี flag
+        'counts': counts,                 # ส่งจำนวนนับไปโชว์ที่ปุ่ม
     }
+    
     return render(request, 'boards/dashboard.html', context)
 
 @login_required
@@ -107,8 +152,9 @@ def board_list(request):
 @login_required
 def board_detail(request, board_id):
     board = get_object_or_404(
-        Board, 
-        Q(created_by=request.user) | Q(members=request.user),
+        Board.objects.filter(
+            Q(created_by=request.user) | Q(members=request.user)
+        ).distinct(),  # <--- พระเอกของเราอยู่ตรงนี้ครับ
         id=board_id
     )
     # ... (code ส่วนดึง lists, tasks เหมือนเดิม)
@@ -204,6 +250,8 @@ def list_delete(request, list_id):
 
 @login_required
 def task_create(request, list_id):
+    # หมายเหตุ: ตรงนี้คุณล็อคไว้ให้เฉพาะเจ้าของบอร์ดสร้างงานได้ (board__created_by=request.user)
+    # ถ้าอยากให้สมาชิกสร้างได้ด้วย ต้องแก้ query ตรงนี้เพิ่มในอนาคตครับ
     list_obj = get_object_or_404(List, id=list_id, board__created_by=request.user)
 
     if request.method == "POST":
@@ -212,9 +260,21 @@ def task_create(request, list_id):
             task = form.save(commit=False)
             task.list = list_obj
             task.save()
-            label_ids = request.POST.getlist('labels') # รับค่าจากฟอร์ม (list ของ id)
+            
+            label_ids = request.POST.getlist('labels')
             if label_ids:
-                task.labels.set(label_ids) # บันทึกความสัมพันธ์ Many-to-Many
+                task.labels.set(label_ids)
+            
+            # ✅ [ส่วนที่เพิ่ม] Logic แจ้งเตือนตอนสร้างงาน
+            # ถ้ามีการระบุคนรับผิดชอบ และคนนั้นไม่ใช่ตัวเอง
+            if task.assigned_to and task.assigned_to != request.user:
+                Notification.objects.create(
+                    recipient=task.assigned_to,
+                    actor=request.user,
+                    task=task,
+                    message=f"ได้มอบหมายงานใหม่ '{task.title}' ให้คุณ"
+                )
+
             return redirect("board_detail", board_id=list_obj.board.id)
     else:
         form = TaskForm()
@@ -227,15 +287,32 @@ def task_create(request, list_id):
 
 @login_required
 def task_update(request, task_id):
+    # หมายเหตุ: query นี้อนุญาตเฉพาะเจ้าของบอร์ดแก้ไขงาน
     task = get_object_or_404(Task, id=task_id, list__board__created_by=request.user)
 
     if request.method == "POST":
+        # ✅ [ส่วนที่เพิ่ม 1] จำคนรับผิดชอบคนเก่าไว้ก่อน save
+        old_assigned_to = task.assigned_to
+
         form = TaskForm(request.POST, instance=task)
         if form.is_valid():
-            form.save()
+            updated_task = form.save() # บันทึกค่าใหม่
 
             label_ids = request.POST.getlist('labels')
-            task.labels.set(label_ids)
+            updated_task.labels.set(label_ids)
+
+            # ✅ [ส่วนที่เพิ่ม 2] Logic แจ้งเตือนตอนแก้ไข
+            new_assigned_to = updated_task.assigned_to
+
+            # เงื่อนไข: มีคนรับผิดชอบ + ไม่ใช่ตัวเอง + และต้องเป็นคนใหม่ (ไม่ซ้ำคนเดิม)
+            if new_assigned_to and new_assigned_to != request.user:
+                if new_assigned_to != old_assigned_to:
+                    Notification.objects.create(
+                        recipient=new_assigned_to,
+                        actor=request.user,
+                        task=updated_task,
+                        message=f"ได้มอบหมายงาน '{updated_task.title}' ให้คุณ"
+                    )
 
             return redirect("board_detail", board_id=task.list.board.id)
     else:
@@ -411,8 +488,21 @@ def add_comment(request, task_id):
         if not content:
             return JsonResponse({'error': 'Empty content'}, status=400)
 
+        # 1. สร้างคอมเมนต์
         comment = Comment.objects.create(task=task, author=request.user, content=content)
         
+        # ✅ [ส่วนที่เพิ่ม] Logic แจ้งเตือน Comment
+        # แจ้งเตือนเจ้าของงาน (Assignee) ถ้ามีคนมอบหมาย และคนเม้นไม่ใช่เจ้าของงานเอง
+        if task.assigned_to and task.assigned_to != request.user:
+            Notification.objects.create(
+                recipient=task.assigned_to,
+                actor=request.user,
+                task=task,
+                message=f"ได้แสดงความคิดเห็นในงาน '{task.title}': \"{content[:20]}{'...' if len(content)>20 else ''}\""
+            )
+            # หมายเหตุ: ผมเพิ่มตัดคำ (slice) ให้โชว์เนื้อหาคอมเมนต์สั้นๆ ในแจ้งเตือนด้วย จะได้ดูรู้เรื่องขึ้นครับ
+
+        # 2. เตรียมข้อมูลส่งกลับ
         avatar_url = comment.author.profile_image.url if comment.author.profile_image else None
 
         return JsonResponse({
@@ -586,4 +676,36 @@ def delete_attachment(request, attachment_id):
     attachment.delete()
     # หมายเหตุ: ปกติ Django จะลบ record ใน DB แต่ไฟล์จริงอาจจะยังอยู่
     # ถ้าอยากให้ลบไฟล์จริงด้วย ต้องใช้ signal หรือ library เสริม (แต่เบื้องต้นแค่นี้ก่อนได้ครับ)
+    return JsonResponse({'success': True})
+
+@login_required
+def get_notifications(request):
+    notifications = Notification.objects.filter(recipient=request.user).order_by('-created_at')[:10] # เอาแค่ 10 อันล่าสุด
+    unread_count = Notification.objects.filter(recipient=request.user, is_read=False).count()
+    
+    data = [{
+        'id': n.id,
+        'actor': n.actor.username,
+        'actor_avatar': n.actor.profile_image.url if n.actor.profile_image else None,
+        'message': n.message,
+        'task_id': n.task.id,
+        'board_id': n.task.list.board.id,
+        'is_read': n.is_read,
+        'created_at': n.created_at.strftime('%d/%m %H:%M')
+    } for n in notifications]
+    
+    return JsonResponse({'notifications': data, 'unread_count': unread_count})
+
+@login_required
+@require_POST
+def mark_notification_read(request, notification_id):
+    notification = get_object_or_404(Notification, id=notification_id, recipient=request.user)
+    notification.is_read = True
+    notification.save()
+    return JsonResponse({'success': True})
+
+@login_required
+@require_POST
+def mark_all_read(request):
+    Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
     return JsonResponse({'success': True})

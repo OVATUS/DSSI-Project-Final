@@ -43,6 +43,11 @@ urlpatterns = [
     path("task/<int:task_id>/comments/", get_comments, name="get_comments"),
     path("task/<int:task_id>/comments/add/", add_comment, name="add_comment"),
 
-    # API สำหรับ Search (เพิ่มบรรทัดนี้)
+    # API สำหรับ Search 
     path("api/search/", search_boards_api, name="search_boards_api"),
+
+    # notification
+    path('notifications/', get_notifications, name='get_notifications'),
+    path('notifications/<int:notification_id>/read/', mark_notification_read, name='mark_notification_read'),
+    path('notifications/read-all/', mark_all_read, name='mark_all_read'),
 ]
