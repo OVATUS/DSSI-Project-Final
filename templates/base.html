@@ -21,25 +21,29 @@
     
     {% tailwind_css %}
   </head>
-
  <body class="bg-gray-100 min-h-screen">
+    {# ✅ เพิ่ม block main_container_classes รอบ div ที่มี pt-14 #}
+    {% block main_container_classes %}
     <div class="flex flex-col min-h-screen pt-14"> 
-      {% block layout %}
-      
-        {% block navbar %} 
-          {% include "components/navbar.html" %} 
+    {% endblock %}   
+        {# โค้ดส่วน navbar/sidebar/main ที่เหลือเหมือนเดิม #}
+        {% block layout %}
+        
+            {% block navbar %} 
+                {% include "components/navbar.html" %} 
+            {% endblock %}
+
+            <div class="flex flex-1 relative"> 
+                {% block sidebar %} 
+                    {% include "components/sidebar.html" %} 
+                {% endblock %}
+
+                <main class="flex-1 w-full max-w-full relative">
+                    {% block content %}{% endblock %}
+                </main>
+            </div>
+
         {% endblock %}
-
-        <div class="flex flex-1 relative"> {% block sidebar %} 
-            {% include "components/sidebar.html" %} 
-          {% endblock %}
-
-          <main class="flex-1 w-full max-w-full relative">
-            {% block content %}{% endblock %}
-          </main>
-        </div>
-
-      {% endblock %}
     </div>
 </body>
 </html>

@@ -1,6 +1,5 @@
 // static/js/main.js
 
-// ✅ ฟังก์ชันช่วยดึง Cookie (แก้ปัญหา CSRF Token)
 function getCookie(name) {
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {
@@ -53,9 +52,11 @@ window.boardDetailPage = function (config) {
         taskPriority: 'medium',
         taskLabels: [],
         
+        // ✅ 1. เพิ่มตัวแปรนี้ (สำคัญมาก ไม่งั้น Alpine จะหาไม่เจอ)
+        taskIsArchived: false, 
 
         // ==== List Modal ====
-       listModalOpen: false,
+        listModalOpen: false,
         listModalMode: 'create',
         listTitle: '',
         listActionUrl: '',
@@ -128,10 +129,33 @@ window.boardDetailPage = function (config) {
         },
 
         // ------------------------------------------------------------------
-        // ✅ Section 2: Drag & Drop Logic
+        // ✅ Section 2: Archive Logic (ย้ายมาไว้ข้างในนี้)
+        // ------------------------------------------------------------------
+        async toggleArchive(taskId, csrfToken) {
+            try {
+                const response = await fetch(`/board/task/${taskId}/toggle-archive/`, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrfToken }
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    // ใช้ this. เพื่ออ้างอิงตัวแปรใน Alpine scope
+                    this.taskIsArchived = data.is_archived; 
+                    this.taskModalOpen = false;
+                    window.location.reload(); 
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Archive failed:', error);
+            }
+        },
+
+        // ------------------------------------------------------------------
+        // ✅ Section 3: Drag & Drop Logic
         // ------------------------------------------------------------------
 
-        // 1. เริ่มลาก Task
         onDragStartTask(event, taskId) {
             this.draggingTaskId = taskId;
             this.draggingListId = null;
@@ -140,20 +164,17 @@ window.boardDetailPage = function (config) {
             event.target.classList.add('opacity-50', 'dragging');
         },
 
-        // 2. ลากเสร็จ
         onDragEndTask(event) {
             event.target.classList.remove('opacity-50', 'dragging');
             this.draggingTaskId = null;
         },
 
-        // 3. เริ่มลาก List
         onDragStartList(event, listId) {
             this.draggingListId = listId;
             this.draggingTaskId = null;
             event.dataTransfer.effectAllowed = 'move';
         },
 
-        // 4. ✅ (ส่วนที่เคยหายไป) ขณะลากผ่านลิสต์
         onDragOver(event) {
             if (this.draggingListId) {
                 event.preventDefault();
@@ -177,7 +198,6 @@ window.boardDetailPage = function (config) {
             }
         },
 
-        // 5. ✅ (ส่วนที่เคยหายไป) Helper คำนวณตำแหน่ง
         getDragAfterElement(container, y) {
             const draggableElements = [...container.querySelectorAll('[draggable="true"]:not(.dragging)')];
 
@@ -193,7 +213,6 @@ window.boardDetailPage = function (config) {
             }, { offset: Number.NEGATIVE_INFINITY }).element;
         },
 
-        // 6. วาง (Drop)
         async onDrop(event, listId) {
             const csrftoken = getCookie('csrftoken');
 
@@ -254,4 +273,4 @@ window.boardDetailPage = function (config) {
             }
         },
     };
-}
+};

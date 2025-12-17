@@ -369,6 +369,20 @@
                     />
                 </div>
 
+                <div class="pt-6 border-t border-gray-200">
+                  <button 
+                      type="button" 
+                      @click="toggleArchive({{ task.id }}, '{{ csrf_token }}')"
+                      class="w-full text-sm font-medium px-3 py-2 rounded-lg transition-colors flex items-center justify-center gap-2"
+                      :class="taskIsArchived ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
+                  >
+                      <svg x-show="!taskIsArchived" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
+                      <svg x-show="taskIsArchived" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                      
+                      <span x-text="taskIsArchived ? 'นำออกจากการเก็บถาวร' : 'เก็บถาวร (Archive)'"></span>
+                  </button>
+              </div>
+
                {# --- SECTION 4: ป้ายกำกับ (อยู่ใน Grid) --- #}
               <div 
                 class="col-span-1 sm:col-span-3 space-y-2 mt-4 pt-4 border-t border-gray-200"

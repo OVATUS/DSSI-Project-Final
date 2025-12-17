@@ -38,6 +38,8 @@ urlpatterns = [
     path("task/<int:task_id>/delete/", task_delete, name="task_delete"),
     path("task/move/", task_move, name="task_move"),
     path('board/<int:board_id>/label/create/', create_label, name='create_label'),
+    # API สำหรับ Archive/Unarchive Task
+    path('task/<int:task_id>/toggle-archive/', toggle_task_archive, name='toggle_task_archive'),
 
     #Comment 
     path("task/<int:task_id>/comments/", get_comments, name="get_comments"),

@@ -8,6 +8,8 @@
   x-data="boardDetailPage({
     moveUrl: '{% url 'task_move' %}',
     listMoveUrl: '{% url 'list_reorder' board.id %}',
+    taskIsArchived: false,
+    taskId: null,
   })"
   class="fixed inset-0 top-14 w-full h-[calc(100vh-3.5rem)] flex flex-col bg-linear-to-br from-slate-50 to-slate-200 overflow-hidden"
 >

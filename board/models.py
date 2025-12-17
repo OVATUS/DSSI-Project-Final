@@ -79,7 +79,7 @@ class Task(models.Model):
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     position = models.IntegerField(default=0)
-    
+    is_archived = models.BooleanField(default=False) 
     assigned_to = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,

@@ -7,7 +7,7 @@ from users.models import User
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.db.models import Max
-from django.db.models import Q
+from django.db.models import Q, Prefetch
 import json
 from django.utils import timezone
 from datetime import timedelta
@@ -158,9 +158,10 @@ def board_detail(request, board_id):
         id=board_id
     )
     # ... (code ส่วนดึง lists, tasks เหมือนเดิม)
-    lists = board.lists.all().prefetch_related("tasks").order_by("position")
-    
-    
+    lists = board.lists.all().prefetch_related(
+        Prefetch('tasks', queryset=Task.objects.filter(is_archived=False).order_by('position').select_related('assigned_to').prefetch_related('labels'))
+        ).order_by('position')
+
     users = User.objects.filter(
         Q(id=board.created_by.id) | Q(joined_boards=board)
     ).distinct()
@@ -382,6 +383,26 @@ def task_move(request):
         
     except Exception as e:
         return JsonResponse({"success": False, "error": str(e)}, status=500)
+
+@require_POST
+@login_required
+def toggle_task_archive(request, task_id):
+    # ต้องมั่นใจว่า Task นั้นเป็นของบอร์ดที่เราสร้าง/เป็นสมาชิก
+    task = get_object_or_404(Task, id=task_id, list__board__members=request.user)
+    
+    # หรือใช้ logic ตรวจสอบสิทธิ์แบบละเอียดที่คุณมีอยู่
+    # if request.user != task.list.board.created_by and request.user not in task.list.board.members.all():
+    #      return JsonResponse({'success': False, 'error': 'Unauthorized'}, status=403)
+
+    # สลับสถานะ (True เป็น False, False เป็น True)
+    task.is_archived = not task.is_archived
+    task.save()
+    
+    return JsonResponse({
+        'success': True, 
+        'is_archived': task.is_archived,
+        'message': 'Task archived successfully' if task.is_archived else 'Task unarchived successfully'
+    })
 
 @require_POST
 @login_required
