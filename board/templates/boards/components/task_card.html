@@ -3,20 +3,20 @@
 <div
   class="group bg-white p-2.5 rounded-lg shadow-sm border border-gray-200 hover:shadow-md hover:border-indigo-300 cursor-pointer transition-all duration-200 select-none relative"
   @click="
-    taskMode = 'edit';                // ตั้งโหมดเป็นแก้ไข
-    taskModalOpen = true;             // สั่งเปิด Modal
-    loadComments({{ task.id }});      // เรียกฟังก์ชันโหลดคอมเมนต์จาก Main.js
-    taskId = {{ task.id }};           // เก็บ ID ของงาน
-    taskListTitle = '{{ lst.title|escapejs }}'; // ชื่อลิสต์ (เช่น To Do, Doing)
-    taskActionUrl = '{% url 'task_update' task.id %}'; // URL สำหรับกด Save
-    taskTitle = '{{ task.title|escapejs }}';           // ชื่อหัวข้องาน
-    taskDescription = '{{ task.description|default_if_none:''|escapejs }}'; // รายละเอียดงาน
-    taskAssignedTo = '{{ task.assigned_to_id|default:'' }}'; // ID ผู้รับผิดชอบ
-    taskPriority = '{{ task.priority }}';             // ระดับความสำคัญ
-    taskDueDate = '{{ task.due_date|default_if_none:''|date:'Y-m-d\\TH:i' }}'; // วันกำหนดส่ง (Format สำหรับ input datetime-local)
-    taskIsArchived = {% if task.is_archived %}true{% else %}false{% endif %}; // สถานะการเก็บถาวร
+    taskMode = 'edit';
+    taskModalOpen = true;
+    loadComments({{ task.id }});
+    taskId = {{ task.id }};
+    taskListTitle = '{{ lst.title|escapejs }}';
+    taskActionUrl = '{% url 'task_update' task.id %}';
+    taskTitle = '{{ task.title|escapejs }}';
+    taskDescription = '{{ task.description|default_if_none:''|escapejs }}';
+    taskAssignedTo = '{{ task.assigned_to_id|default:'' }}';
+    taskPriority = '{{ task.priority }}';
+    taskDueDate = '{{ task.due_date|default_if_none:''|date:'Y-m-d\\TH:i' }}';
+    taskIsArchived = {% if task.is_archived %}true{% else %}false{% endif %};
     
-    // โหลดรายการ Checklist เข้าสู่ตัวแปร Alpine.js
+    // โหลด Checklist
     if (typeof checklistItems !== 'undefined') {
         checklistItems = [
             {% for item in task.checklist_items.all %}
@@ -25,7 +25,7 @@
         ];
     }
     
-    // โหลดรายการไฟล์แนบ (Attachments) เข้าสู่ตัวแปร Alpine.js
+    // โหลด Attachments
     if (typeof attachmentItems !== 'undefined') {
         attachmentItems = [
             {% for att in task.attachments.all %}
@@ -53,18 +53,45 @@
   </div>
   {% endif %}
 
-  {# --- ส่วนที่ 2: ชื่อหัวข้องานและปุ่มแก้ไขด่วน --- #}
+  {# --- ส่วนที่ 2: ชื่อหัวข้องานและปุ่ม Action --- #}
   <div class="flex justify-between items-start gap-2 mb-2">
-    <h3 class="text-sm font-medium text-gray-700 leading-snug ">
+    <h3 class="text-sm font-medium text-gray-700 leading-snug break-words">
       {{ task.title }}
     </h3>
     
-    {# ปุ่มไอคอนดินสอ (โผล่มาเฉพาะตอนเอาเมาส์จี้ที่การ์ดด้วย group-hover) #}
-    <button class="text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-all p-0.5 rounded hover:bg-gray-100 -mr-1 -mt-1 flex-shrink-0">
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-        <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-      </svg>
-    </button>
+    {# กลุ่มปุ่ม (จะโผล่เมื่อเอาเมาส์จี้การ์ด) #}
+    <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity -mr-1 -mt-1 flex-shrink-0">
+        
+        {# ✅ 1. ปุ่ม Archive (เพิ่มใหม่ตรงนี้) #}
+        <button 
+            type="button"
+            class="text-gray-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"
+            title="เก็บถาวร (Archive)"
+            @click.stop="
+                if(confirm('ยืนยันเก็บถาวรงานนี้?')) {
+                    fetch('{% url "toggle_task_archive" task.id %}', {
+                        method: 'POST',
+                        headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+                    })
+                    .then(res => {
+                        if(res.ok) window.location.reload();
+                        else alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+                    });
+                }
+            "
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+        </button>
+
+        {# 2. ปุ่ม Edit (ของเดิม) #}
+        <button class="text-gray-400 hover:text-indigo-600 p-1 rounded hover:bg-gray-100 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+            </svg>
+        </button>
+    </div>
   </div>
 
   {# --- ส่วนที่ 3: ข้อมูลสถานะต่างๆ (Footer Icons) --- #}
@@ -73,14 +100,14 @@
     {# ฝั่งซ้าย: ไอคอนแสดงวันส่ง, คอมเมนต์, เช็คลิสต์ และไฟล์แนบ #}
     <div class="flex items-center flex-wrap gap-x-2 gap-y-1">
         
-      {# วันกำหนดส่ง: แสดงสีตามความด่วน (Overdue = แดง, Soon = ส้ม) #}
+      {# วันกำหนดส่ง #}
       {% if task.due_date %}
       <div 
           class="flex items-center gap-1 text-[10px] px-1 py-0.5 rounded font-medium border
           {% if task.due_status == 'overdue' %} bg-red-50 text-red-600 border-red-100
           {% elif task.due_status == 'soon' %} bg-orange-50 text-orange-600 border-orange-100
           {% else %} bg-gray-50 text-gray-500 border-gray-100 {% endif %}"
-        title="กำหนดส่ง: {{ task.due_date|date:'d M Y H:i' }}"
+          title="กำหนดส่ง: {{ task.due_date|date:'d M Y H:i' }}"
       >
             <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -89,7 +116,7 @@
         </div>
         {% endif %}
 
-        {# ไอคอนคอมเมนต์: แสดงจำนวนถ้ามีคนคอมเมนต์ #}
+        {# ไอคอนคอมเมนต์ #}
         {% if task.comments.exists %}
         <div class="flex items-center gap-0.5 text-gray-400 hover:text-gray-600 transition-colors" title="{{ task.comments.count }} ความคิดเห็น">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -99,7 +126,7 @@
         </div>
         {% endif %}
 
-        {# ไอคอนเช็คลิสต์: แสดงจำนวนรายการย่อย #}
+        {# ไอคอนเช็คลิสต์ #}
         {% if task.checklist_items.exists %}
         <div class="flex items-center gap-0.5 text-gray-400 hover:text-gray-600" title="Checklist">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -109,7 +136,7 @@
         </div>
         {% endif %}
 
-        {# ไอคอนคลิปหนีบกระดาษ: แสดงจำนวนไฟล์แนบ #}
+        {# ไอคอนไฟล์แนบ #}
         {% if task.attachments.exists %}
         <div class="flex items-center gap-0.5 text-gray-400 hover:text-gray-600" title="Attachments">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -120,7 +147,7 @@
         {% endif %}
     </div>
 
-    {# ฝั่งขวา: รูป Profile หรือตัวอักษรแรกของชื่อผู้รับผิดชอบงาน #}
+    {# ฝั่งขวา: รูปคนรับผิดชอบ #}
     {% if task.assigned_to %}
     <div class="pl-2 flex-shrink-0">
       {% if task.assigned_to.profile_image %}

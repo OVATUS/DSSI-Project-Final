@@ -248,12 +248,18 @@ def list_delete(request, list_id):
         return redirect("board_detail", board_id=board_id)
 
     return render(request, "boards/list_confirm_delete.html", {"list": list_obj})
+# แก้ไขเฉพาะส่วน logic ของ view
+from django.db.models import Q  # อย่าลืม import Q ด้านบนสุดของไฟล์ด้วยนะครับ
 
 @login_required
 def task_create(request, list_id):
-    # หมายเหตุ: ตรงนี้คุณล็อคไว้ให้เฉพาะเจ้าของบอร์ดสร้างงานได้ (board__created_by=request.user)
-    # ถ้าอยากให้สมาชิกสร้างได้ด้วย ต้องแก้ query ตรงนี้เพิ่มในอนาคตครับ
-    list_obj = get_object_or_404(List, id=list_id, board__created_by=request.user)
+    # ✅ แก้ไขตรงนี้: เช็คว่าเป็น Owner (created_by) หรือ Member (members)
+    list_obj = get_object_or_404(
+        List.objects.filter(
+            Q(board__created_by=request.user) | Q(board__members=request.user)
+        ).distinct(),
+        id=list_id
+    )
 
     if request.method == "POST":
         form = TaskForm(request.POST)
@@ -266,8 +272,7 @@ def task_create(request, list_id):
             if label_ids:
                 task.labels.set(label_ids)
             
-            # ✅ [ส่วนที่เพิ่ม] Logic แจ้งเตือนตอนสร้างงาน
-            # ถ้ามีการระบุคนรับผิดชอบ และคนนั้นไม่ใช่ตัวเอง
+            # Logic แจ้งเตือน (เหมือนเดิม)
             if task.assigned_to and task.assigned_to != request.user:
                 Notification.objects.create(
                     recipient=task.assigned_to,
@@ -288,11 +293,16 @@ def task_create(request, list_id):
 
 @login_required
 def task_update(request, task_id):
-    # หมายเหตุ: query นี้อนุญาตเฉพาะเจ้าของบอร์ดแก้ไขงาน
-    task = get_object_or_404(Task, id=task_id, list__board__created_by=request.user)
+    # ✅ แก้ไข Query: เช็คว่าเป็น Owner (created_by) หรือ Member (members)
+    task = get_object_or_404(
+        Task.objects.filter(
+            Q(list__board__created_by=request.user) | Q(list__board__members=request.user)
+        ).distinct(),
+        id=task_id
+    )
 
     if request.method == "POST":
-        # ✅ [ส่วนที่เพิ่ม 1] จำคนรับผิดชอบคนเก่าไว้ก่อน save
+        # จำคนรับผิดชอบคนเก่าไว้ก่อน save
         old_assigned_to = task.assigned_to
 
         form = TaskForm(request.POST, instance=task)
@@ -302,7 +312,7 @@ def task_update(request, task_id):
             label_ids = request.POST.getlist('labels')
             updated_task.labels.set(label_ids)
 
-            # ✅ [ส่วนที่เพิ่ม 2] Logic แจ้งเตือนตอนแก้ไข
+            # Logic แจ้งเตือนตอนแก้ไข
             new_assigned_to = updated_task.assigned_to
 
             # เงื่อนไข: มีคนรับผิดชอบ + ไม่ใช่ตัวเอง + และต้องเป็นคนใหม่ (ไม่ซ้ำคนเดิม)
@@ -324,10 +334,15 @@ def task_update(request, task_id):
         "list": task.list,
     })
 
-
 @login_required
 def task_delete(request, task_id):
-    task = get_object_or_404(Task, id=task_id, list__board__created_by=request.user)
+    # ✅ แก้ไข Query: เช็คว่าเป็น Owner (created_by) หรือ Member (members)
+    task = get_object_or_404(
+        Task.objects.filter(
+            Q(list__board__created_by=request.user) | Q(list__board__members=request.user)
+        ).distinct(),
+        id=task_id
+    )
     board_id = task.list.board.id
 
     if request.method == "POST":
@@ -337,8 +352,6 @@ def task_delete(request, task_id):
     return render(request, "tasks/task_confirm_delete.html", {
         "task": task,
     })
-
-# board/views.py
 
 @require_POST
 @login_required
