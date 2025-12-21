@@ -11,6 +11,7 @@ urlpatterns = [
     path("<int:board_id>/", board_detail, name="board_detail"),
     path("<int:board_id>/edit/", board_update, name="board_update"),
     path("<int:board_id>/delete/", board_delete, name="board_delete"),
+    path('board/<int:board_id>/archived-tasks/', get_archived_tasks, name='get_archived_tasks'),
 
     # Menber
     path("<int:board_id>/add_member/", add_member, name="add_member"),

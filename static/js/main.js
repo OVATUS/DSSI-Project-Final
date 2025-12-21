@@ -51,6 +51,9 @@ window.boardDetailPage = function (config) {
         taskDueDate: '',
         taskPriority: 'medium',
         taskLabels: [],
+        archivedDrawerOpen: false, // เปิด/ปิดลิ้นชัก
+        archivedTasks: [],         // เก็บรายการงานที่ดึงมา
+        isLoadingArchived: false,  // สถานะโหลด
         
         // ✅ 1. เพิ่มตัวแปรนี้ (สำคัญมาก ไม่งั้น Alpine จะหาไม่เจอ)
         taskIsArchived: false, 
@@ -78,9 +81,37 @@ window.boardDetailPage = function (config) {
         newCommentText: '',
         isLoadingComments: false,
 
+       
+       async loadArchivedTasks(boardId) {
+            this.archivedDrawerOpen = true; // เปิดลิ้นชักทันที
+            this.isLoadingArchived = true;
+            this.archivedTasks = [];
+
+            try {
+                const res = await fetch(`/board/${boardId}/archived-tasks/`);
+                const data = await res.json();
+                this.archivedTasks = data.tasks || [];
+            } catch (err) {
+                console.error("Error loading archived tasks:", err);
+            } finally {
+                this.isLoadingArchived = false;
+            }
+        },
+
+        // ✅ 3. ฟังก์ชันกู้คืนงาน (ใช้ API ตัวเดิมที่มีอยู่แล้วได้เลย)
+        async restoreTask(taskId, csrfToken) {
+            if(!confirm('ต้องการกู้คืนงานนี้กลับไปที่บอร์ด?')) return;
+            
+            // เรียกใช้ฟังก์ชัน toggleArchive ตัวเดิม (เพราะมันสลับ True <-> False ให้อยู่แล้ว)
+            await this.toggleArchive(taskId, csrfToken);
+            
+            // หมายเหตุ: toggleArchive เดิมของเราสั่ง reload หน้าเว็บอยู่แล้ว 
+            // ดังนั้นพอกู้คืนเสร็จ หน้าเว็บจะรีเฟรชและงานจะกลับมาเองครับ
+        },
         // ------------------------------------------------------------------
         // ✅ Section 1: Comment Logic
         // ------------------------------------------------------------------
+        
         async loadComments(taskId) {
             this.currentTaskId = taskId;
             this.comments = [];

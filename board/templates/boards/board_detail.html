@@ -93,6 +93,13 @@
 
         {# ใน board_detail.html ส่วน Header ฝั่งขวา #}
       <div class="flex items-center gap-2 mr-2">
+        <button 
+          @click="loadArchivedTasks({{ board.id }})" 
+          class="flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors ml-2"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
+          <span>คลังที่เก็บ (Archived)</span>
+        </button>
         <span class="text-xs text-gray-500 font-bold">Filter:</span>
     
           <select x-model="filterMember" class="text-xs border-gray-300 rounded-full py-1 pl-2 pr-6 bg-gray-50 focus:ring-indigo-500">
@@ -201,20 +208,20 @@
             </div>
 
             <div 
-                class="flex-1 overflow-y-auto px-2 pb-2 space-y-2 min-h-[50px] custom-scrollbar task-container"
-                @dragover="onDragOver($event)" 
-                @drop="onDrop($event, {{ lst.id }})"
+              class="flex-1 overflow-y-auto px-2 pb-2 space-y-2 min-h-[50px] custom-scrollbar task-container"
+              @dragover="onDragOver($event)" 
+              @drop="onDrop($event, {{ lst.id }})"
             >
-                {% for task in lst.tasks.all %}
-                <div 
-                    class="transform transition hover:-translate-y-1 duration-200 cursor-pointer" 
-                    draggable="true"
-                    data-task-id="{{ task.id }}"
-                    data-assigned-id="{{ task.assigned_to.id|default:'unassigned' }}"
-                    x-show="!filterMember || filterMember == $el.dataset.assignedId"
-                    @dragstart="onDragStartTask($event, {{ task.id }})"
-                    @dragend="onDragEndTask($event)"
-                    @click="
+              {% for task in lst.tasks.all %}
+              <div 
+                class="transform transition hover:-translate-y-1 duration-200 cursor-pointer" 
+                draggable="true"
+                data-task-id="{{ task.id }}"
+                data-assigned-id="{{ task.assigned_to.id|default:'unassigned' }}"
+                x-show="!filterMember || filterMember == $el.dataset.assignedId"
+                @dragstart="onDragStartTask($event, {{ task.id }})"
+                @dragend="onDragEndTask($event)"
+                @click="
                         taskMode = 'edit';
                         taskModalOpen = true;
                         taskId = {{ task.id }}; 
@@ -300,7 +307,9 @@
   {% include "boards/components/popup_list_form.html" %}
   {% include "boards/components/popup_list_delete.html" %}
   {% include "boards/components/popup_add_member.html" %}
+  {% include "boards/components/archive_drawer.html" %}
   {% include "boards/components/popup_task_form.html" %}
+  
   
 </div>
 {% endblock %}

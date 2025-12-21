@@ -730,3 +730,26 @@ def mark_notification_read(request, notification_id):
 def mark_all_read(request):
     Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
     return JsonResponse({'success': True})
+
+@login_required
+def get_archived_tasks(request, board_id):
+    # ตรวจสอบว่ามีสิทธิ์ในบอร์ดนี้
+    board = get_object_or_404(Board, id=board_id)
+    if request.user != board.created_by and request.user not in board.members.all():
+         return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+    # ดึงงานที่ is_archived=True ของบอร์ดนี้
+    tasks = Task.objects.filter(
+        list__board=board, 
+        is_archived=True
+    ).select_related('list').order_by('-updated_at')
+
+    # แปลงเป็น JSON
+    data = [{
+        'id': task.id,
+        'title': task.title,
+        'list_title': task.list.title,
+        'archived_at': task.updated_at.strftime('%d/%m/%Y %H:%M')
+    } for task in tasks]
+
+    return JsonResponse({'tasks': data})

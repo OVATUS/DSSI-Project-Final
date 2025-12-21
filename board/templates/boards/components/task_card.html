@@ -3,19 +3,20 @@
 <div
   class="group bg-white p-2.5 rounded-lg shadow-sm border border-gray-200 hover:shadow-md hover:border-indigo-300 cursor-pointer transition-all duration-200 select-none relative"
   @click="
-    taskMode = 'edit';
-    taskModalOpen = true;
-    loadComments({{ task.id }});
-    taskId = {{ task.id }};
-    taskListTitle = '{{ lst.title|escapejs }}';
-    taskActionUrl = '{% url 'task_update' task.id %}';
-    taskTitle = '{{ task.title|escapejs }}';
-    taskDescription = '{{ task.description|default_if_none:''|escapejs }}';
-    taskAssignedTo = '{{ task.assigned_to_id|default:'' }}';
-    taskPriority = '{{ task.priority }}';
-    taskDueDate = '{{ task.due_date|default_if_none:''|date:'Y-m-d\\TH:i' }}';
+    taskMode = 'edit';                // ตั้งโหมดเป็นแก้ไข
+    taskModalOpen = true;             // สั่งเปิด Modal
+    loadComments({{ task.id }});      // เรียกฟังก์ชันโหลดคอมเมนต์จาก Main.js
+    taskId = {{ task.id }};           // เก็บ ID ของงาน
+    taskListTitle = '{{ lst.title|escapejs }}'; // ชื่อลิสต์ (เช่น To Do, Doing)
+    taskActionUrl = '{% url 'task_update' task.id %}'; // URL สำหรับกด Save
+    taskTitle = '{{ task.title|escapejs }}';           // ชื่อหัวข้องาน
+    taskDescription = '{{ task.description|default_if_none:''|escapejs }}'; // รายละเอียดงาน
+    taskAssignedTo = '{{ task.assigned_to_id|default:'' }}'; // ID ผู้รับผิดชอบ
+    taskPriority = '{{ task.priority }}';             // ระดับความสำคัญ
+    taskDueDate = '{{ task.due_date|default_if_none:''|date:'Y-m-d\\TH:i' }}'; // วันกำหนดส่ง (Format สำหรับ input datetime-local)
+    taskIsArchived = {% if task.is_archived %}true{% else %}false{% endif %}; // สถานะการเก็บถาวร
     
-    // โหลด Checklist (ถ้ามี logic นี้ในหน้าหลัก)
+    // โหลดรายการ Checklist เข้าสู่ตัวแปร Alpine.js
     if (typeof checklistItems !== 'undefined') {
         checklistItems = [
             {% for item in task.checklist_items.all %}
@@ -24,7 +25,7 @@
         ];
     }
     
-    // โหลด Attachments (ถ้ามี logic นี้)
+    // โหลดรายการไฟล์แนบ (Attachments) เข้าสู่ตัวแปร Alpine.js
     if (typeof attachmentItems !== 'undefined') {
         attachmentItems = [
             {% for att in task.attachments.all %}
@@ -40,7 +41,7 @@
     }
   "
 >
-  {# --- 1. ส่วนป้ายกำกับ (Labels) --- #}
+  {# --- ส่วนที่ 1: แถบป้ายกำกับ (Labels) --- #}
   {% if task.labels.all %}
   <div class="flex flex-wrap gap-1 mb-2">
     {% for label in task.labels.all %}
@@ -52,13 +53,13 @@
   </div>
   {% endif %}
 
-  {# --- 2. ส่วนหัวข้อและปุ่ม Edit --- #}
+  {# --- ส่วนที่ 2: ชื่อหัวข้องานและปุ่มแก้ไขด่วน --- #}
   <div class="flex justify-between items-start gap-2 mb-2">
-    <h3 class="text-sm font-medium text-gray-700 leading-snug break-words">
+    <h3 class="text-sm font-medium text-gray-700 leading-snug ">
       {{ task.title }}
     </h3>
     
-    {# ปุ่ม Edit (โผล่เมื่อ Hover) #}
+    {# ปุ่มไอคอนดินสอ (โผล่มาเฉพาะตอนเอาเมาส์จี้ที่การ์ดด้วย group-hover) #}
     <button class="text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-all p-0.5 rounded hover:bg-gray-100 -mr-1 -mt-1 flex-shrink-0">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
         <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
@@ -66,25 +67,21 @@
     </button>
   </div>
 
-  {# --- 3. ส่วน Footer (Metadata) --- #}
+  {# --- ส่วนที่ 3: ข้อมูลสถานะต่างๆ (Footer Icons) --- #}
   <div class="flex items-end justify-between mt-auto">
     
-    {# ฝั่งซ้าย: Icon (วันที่, คอมเมนต์, ไฟล์แนบ) #}
+    {# ฝั่งซ้าย: ไอคอนแสดงวันส่ง, คอมเมนต์, เช็คลิสต์ และไฟล์แนบ #}
     <div class="flex items-center flex-wrap gap-x-2 gap-y-1">
         
-        {# วันกำหนดส่ง (Due Date Badge) #}
-        {% if task.due_date %}
-        <div 
-            class="flex items-center gap-1 text-[10px] px-1 py-0.5 rounded font-medium border
-            {% if task.due_status == 'overdue' %}
-                bg-red-50 text-red-600 border-red-100
-            {% elif task.due_status == 'soon' %}
-                bg-orange-50 text-orange-600 border-orange-100
-            {% else %}
-                bg-gray-50 text-gray-500 border-gray-100
-            {% endif %}"
-            title="กำหนดส่ง: {{ task.due_date|date:'d M Y H:i' }}"
-        >
+      {# วันกำหนดส่ง: แสดงสีตามความด่วน (Overdue = แดง, Soon = ส้ม) #}
+      {% if task.due_date %}
+      <div 
+          class="flex items-center gap-1 text-[10px] px-1 py-0.5 rounded font-medium border
+          {% if task.due_status == 'overdue' %} bg-red-50 text-red-600 border-red-100
+          {% elif task.due_status == 'soon' %} bg-orange-50 text-orange-600 border-orange-100
+          {% else %} bg-gray-50 text-gray-500 border-gray-100 {% endif %}"
+        title="กำหนดส่ง: {{ task.due_date|date:'d M Y H:i' }}"
+      >
             <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -92,7 +89,7 @@
         </div>
         {% endif %}
 
-        {# จำนวนคอมเมนต์ #}
+        {# ไอคอนคอมเมนต์: แสดงจำนวนถ้ามีคนคอมเมนต์ #}
         {% if task.comments.exists %}
         <div class="flex items-center gap-0.5 text-gray-400 hover:text-gray-600 transition-colors" title="{{ task.comments.count }} ความคิดเห็น">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -102,7 +99,7 @@
         </div>
         {% endif %}
 
-        {# (Optional) จำนวน Checklist #}
+        {# ไอคอนเช็คลิสต์: แสดงจำนวนรายการย่อย #}
         {% if task.checklist_items.exists %}
         <div class="flex items-center gap-0.5 text-gray-400 hover:text-gray-600" title="Checklist">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -112,7 +109,7 @@
         </div>
         {% endif %}
 
-        {# (Optional) จำนวนไฟล์แนบ #}
+        {# ไอคอนคลิปหนีบกระดาษ: แสดงจำนวนไฟล์แนบ #}
         {% if task.attachments.exists %}
         <div class="flex items-center gap-0.5 text-gray-400 hover:text-gray-600" title="Attachments">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -123,7 +120,7 @@
         {% endif %}
     </div>
 
-    {# ฝั่งขวา: รูปคนรับผิดชอบ #}
+    {# ฝั่งขวา: รูป Profile หรือตัวอักษรแรกของชื่อผู้รับผิดชอบงาน #}
     {% if task.assigned_to %}
     <div class="pl-2 flex-shrink-0">
       {% if task.assigned_to.profile_image %}
@@ -142,6 +139,5 @@
       {% endif %}
     </div>
     {% endif %}
-
   </div>
 </div>

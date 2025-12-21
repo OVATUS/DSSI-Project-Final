@@ -1,0 +1,92 @@
+{# Archive Drawer (Slide-over) #}
+<div 
+    x-cloak 
+    x-show="archivedDrawerOpen" 
+    class="fixed inset-0 z-50 overflow-hidden" 
+    aria-labelledby="slide-over-title" 
+    role="dialog" 
+    aria-modal="true"
+>
+    {# Backdrop (พื้นหลังมืดๆ) #}
+    <div 
+        x-show="archivedDrawerOpen"
+        x-transition:enter="ease-in-out duration-500"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="ease-in-out duration-500"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        class="absolute inset-0 bg-gray-500 bg-opacity-75 transition-opacity" 
+        @click="archivedDrawerOpen = false"
+    ></div>
+
+    <div class="fixed inset-y-0 right-0 pl-10 max-w-full flex">
+        {# Panel (ตัวลิ้นชัก) #}
+        <div 
+            x-show="archivedDrawerOpen"
+            x-transition:enter="transform transition ease-in-out duration-500 sm:duration-700"
+            x-transition:enter-start="translate-x-full"
+            x-transition:enter-end="translate-x-0"
+            x-transition:leave="transform transition ease-in-out duration-500 sm:duration-700"
+            x-transition:leave-start="translate-x-0"
+            x-transition:leave-end="translate-x-full"
+            class="w-screen max-w-md"
+        >
+            <div class="h-full flex flex-col bg-white shadow-xl overflow-y-scroll">
+                
+                {# Drawer Header #}
+                <div class="px-4 py-6 bg-gray-50 border-b border-gray-200 sm:px-6">
+                    <div class="flex items-start justify-between">
+                        <h2 class="text-lg font-medium text-gray-900" id="slide-over-title">
+                            📦 งานที่เก็บถาวร
+                        </h2>
+                        <div class="ml-3 h-7 flex items-center">
+                            <button @click="archivedDrawerOpen = false" class="bg-white rounded-md text-gray-400 hover:text-gray-500 focus:outline-none">
+                                <span class="sr-only">Close panel</span>
+                                <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {# Drawer Body (List of Tasks) #}
+                <div class="relative flex-1 px-4 py-6 sm:px-6">
+                    
+                    {# Loading State #}
+                    <div x-show="isLoadingArchived" class="flex justify-center py-10">
+                        <svg class="animate-spin h-8 w-8 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    </div>
+
+                    {# Empty State #}
+                    <div x-show="!isLoadingArchived && archivedTasks.length === 0" class="text-center py-10 text-gray-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></svg>
+                        ไม่มีงานที่เก็บถาวร
+                    </div>
+
+                    {# List Items #}
+                    <div class="space-y-4">
+                        <template x-for="task in archivedTasks" :key="task.id">
+                            <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
+                                <h3 class="font-bold text-gray-800 mb-1" x-text="task.title"></h3>
+                                <div class="text-xs text-gray-500 mb-3 flex items-center gap-2">
+                                    <span>จากรายการ: <b x-text="task.list_title"></b></span>
+                                    <span>•</span>
+                                    <span x-text="task.archived_at"></span>
+                                </div>
+                                
+                                <button 
+                                    @click="restoreTask(task.id, '{{ csrf_token }}')"
+                                    class="text-sm bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded shadow-sm hover:bg-gray-50 hover:text-indigo-600 font-medium w-full flex items-center justify-center gap-2 transition-colors"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
+                                    ส่งกลับไปที่บอร์ด (Restore)
+                                </button>
+                            </div>
+                        </template>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
