@@ -400,14 +400,14 @@ def task_move(request):
 @require_POST
 @login_required
 def toggle_task_archive(request, task_id):
-    # ต้องมั่นใจว่า Task นั้นเป็นของบอร์ดที่เราสร้าง/เป็นสมาชิก
-    task = get_object_or_404(Task, id=task_id, list__board__members=request.user)
+    # แก้ไขตรงนี้: ใช้ Q เช็คว่า (เป็นสมาชิก OR เป็นคนสร้าง)
+    task = get_object_or_404(
+        Task, 
+        Q(list__board__members=request.user) | Q(list__board__created_by=request.user),
+        id=task_id
+    )
     
-    # หรือใช้ logic ตรวจสอบสิทธิ์แบบละเอียดที่คุณมีอยู่
-    # if request.user != task.list.board.created_by and request.user not in task.list.board.members.all():
-    #      return JsonResponse({'success': False, 'error': 'Unauthorized'}, status=403)
-
-    # สลับสถานะ (True เป็น False, False เป็น True)
+    # ส่วนที่เหลือเหมือนเดิม
     task.is_archived = not task.is_archived
     task.save()
     
@@ -416,6 +416,7 @@ def toggle_task_archive(request, task_id):
         'is_archived': task.is_archived,
         'message': 'Task archived successfully' if task.is_archived else 'Task unarchived successfully'
     })
+
 
 @require_POST
 @login_required
@@ -746,23 +747,25 @@ def mark_all_read(request):
 
 @login_required
 def get_archived_tasks(request, board_id):
-    # ตรวจสอบว่ามีสิทธิ์ในบอร์ดนี้
-    board = get_object_or_404(Board, id=board_id)
-    if request.user != board.created_by and request.user not in board.members.all():
-         return JsonResponse({'error': 'Unauthorized'}, status=403)
+    # 1. แก้ไขการหา Board: ให้เจอทั้ง "คนสร้าง" และ "สมาชิก"
+    board = get_object_or_404(
+        Board, 
+        Q(members=request.user) | Q(created_by=request.user),
+        id=board_id
+    )
 
-    # ดึงงานที่ is_archived=True ของบอร์ดนี้
+    # 2. ดึงงานที่ is_archived=True
     tasks = Task.objects.filter(
         list__board=board, 
         is_archived=True
-    ).select_related('list').order_by('-updated_at')
+    ).select_related('list').order_by('-created_at')
 
-    # แปลงเป็น JSON
+    # 3. ส่งข้อมูลกลับ
     data = [{
         'id': task.id,
         'title': task.title,
         'list_title': task.list.title,
-        'archived_at': task.updated_at.strftime('%d/%m/%Y %H:%M')
+        'archived_at': task.created_at.strftime('%d/%m/%Y %H:%M')
     } for task in tasks]
 
     return JsonResponse({'tasks': data})
