@@ -1,7 +1,7 @@
 from django.db import models
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
-from .models import Board, List, Task, Comment , Label , BoardInvitation , ChecklistItem, Attachment, Notification
+from .models import Board, List, Task, Comment , Label , BoardInvitation , ChecklistItem, Attachment, Notification , ActivityLog
 from .forms import BoardForm, ListForm, TaskForm  
 from users.models import User
 from django.http import JsonResponse
@@ -11,6 +11,7 @@ from django.db.models import Q, Prefetch
 import json
 from django.utils import timezone
 from datetime import timedelta
+
 
 @login_required
 def board_lsit_view(request):
@@ -202,6 +203,12 @@ def board_delete(request, board_id):
 
     return redirect("project_page")
 
+# ------------------------------#
+# ------------------------------#
+#         LIST VIEWS
+#-------------------------------#
+# ------------------------------#
+
 # LIST CREATE
 @login_required
 def list_create(request, board_id):
@@ -267,7 +274,7 @@ def task_create(request, list_id):
             task = form.save(commit=False)
             task.list = list_obj
             task.save()
-            
+            log_activity(list_obj.board, request.user, f"สร้างการ์ด '{task.title}' ในรายการ '{list_obj.title}'")
             label_ids = request.POST.getlist('labels')
             if label_ids:
                 task.labels.set(label_ids)
@@ -290,6 +297,46 @@ def task_create(request, list_id):
         "list": list_obj,
     })
 
+@require_POST
+@login_required
+def list_reorder(request, board_id):
+    board = get_object_or_404(Board, id=board_id, created_by=request.user)
+    list_id = request.POST.get("list_id")
+    target_id = request.POST.get("target_id")
+
+    if not list_id or not target_id:
+        return JsonResponse({"success": False, "error": "missing params"}, status=400)
+
+    lst = get_object_or_404(List, id=list_id, board=board)
+    target = get_object_or_404(List, id=target_id, board=board)
+
+    # ดึงลิสต์ทั้งหมดเรียงตาม position
+    lists = list(board.lists.order_by("position"))
+
+    # เอาตัวที่ลากออกก่อน
+    lists = [l for l in lists if l.id != lst.id]
+
+    # แทรก lst ไว้ก่อน target
+    new_order = []
+    for l in lists:
+        if l.id == target.id:
+            new_order.append(lst)
+        new_order.append(l)
+
+    # เซฟ position ใหม่เรียงจาก 1...
+    for idx, l in enumerate(new_order, start=1):
+        if l.position != idx:
+            l.position = idx
+            l.save(update_fields=["position"])
+
+    return JsonResponse({"success": True})
+
+    
+# ------------------------------#
+# ------------------------------#
+#         TASk VIEWS
+#-------------------------------#
+# ------------------------------#
 
 @login_required
 def task_update(request, task_id):
@@ -361,17 +408,28 @@ def task_move(request):
         task_id = request.POST.get("task_id")
         list_id = request.POST.get("list_id")
         
-        # ✅ รับ list ของ ID ทั้งหมดในคอลัมน์นั้น (เรียงมาแล้วจาก JS)
-        # ส่งมาเป็น string เช่น "10,5,8" -> แปลงเป็น list [10, 5, 8]
+        # รับ list ของ ID ทั้งหมดในคอลัมน์นั้น (เรียงมาแล้วจาก JS)
         order_str = request.POST.get("order", "") 
         
-        task = get_object_or_404(Task, id=task_id, list__board__created_by=request.user)
+        # ⚠️ หมายเหตุ: ตรงนี้ถ้าอยากให้สมาชิกย้ายได้ด้วย ควรแก้ query เป็น Q(members...) | Q(created_by...) เหมือนอันก่อนหน้าครับ
+        task = get_object_or_404(Task, id=task_id) # แก้เบื้องต้นให้สั้นลง
         target_list = get_object_or_404(List, id=list_id, board=task.list.board)
 
         # 1. ย้าย Task ไปลิสต์ใหม่ (ถ้ามีการเปลี่ยนลิสต์)
         if task.list != target_list:
+            # ✅ 1. เก็บชื่อลิสต์เก่าไว้ก่อนที่จะเปลี่ยนค่า
+            old_list_title = task.list.title
+
+            # เปลี่ยนลิสต์ใหม่
             task.list = target_list
             task.save()
+
+            # ✅ 2. บันทึก Log ทันทีหลังจาก Save
+            log_activity(
+                target_list.board, 
+                request.user, 
+                f"ย้ายการ์ด '{task.title}' จาก '{old_list_title}' ไปยัง '{target_list.title}'"
+            )
 
         # 2. อัปเดต position ของทุก Task ในลิสต์นั้น
         if order_str:
@@ -396,7 +454,6 @@ def task_move(request):
         
     except Exception as e:
         return JsonResponse({"success": False, "error": str(e)}, status=500)
-
 @require_POST
 @login_required
 def toggle_task_archive(request, task_id):
@@ -417,40 +474,41 @@ def toggle_task_archive(request, task_id):
         'message': 'Task archived successfully' if task.is_archived else 'Task unarchived successfully'
     })
 
-
-@require_POST
 @login_required
-def list_reorder(request, board_id):
-    board = get_object_or_404(Board, id=board_id, created_by=request.user)
-    list_id = request.POST.get("list_id")
-    target_id = request.POST.get("target_id")
+@require_POST
+def create_label(request, board_id):
+    board = get_object_or_404(Board, id=board_id)
+    
+    # ตรวจสอบสิทธิ์ว่า user เป็นสมาชิกบอร์ดไหม
+    if request.user not in board.members.all() and board.created_by != request.user:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
 
-    if not list_id or not target_id:
-        return JsonResponse({"success": False, "error": "missing params"}, status=400)
+    try:
+        data = json.loads(request.body)
+        name = data.get('name')
+        color = data.get('color')
 
-    lst = get_object_or_404(List, id=list_id, board=board)
-    target = get_object_or_404(List, id=target_id, board=board)
+        if not name or not color:
+             return JsonResponse({'error': 'Missing data'}, status=400)
 
-    # ดึงลิสต์ทั้งหมดเรียงตาม position
-    lists = list(board.lists.order_by("position"))
+        # สร้าง Label ใหม่
+        label = Label.objects.create(board=board, name=name, color=color)
 
-    # เอาตัวที่ลากออกก่อน
-    lists = [l for l in lists if l.id != lst.id]
+        return JsonResponse({
+            'success': True,
+            'id': label.id,
+            'name': label.name,
+            'color': label.color
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
 
-    # แทรก lst ไว้ก่อน target
-    new_order = []
-    for l in lists:
-        if l.id == target.id:
-            new_order.append(lst)
-        new_order.append(l)
 
-    # เซฟ position ใหม่เรียงจาก 1...
-    for idx, l in enumerate(new_order, start=1):
-        if l.position != idx:
-            l.position = idx
-            l.save(update_fields=["position"])
-
-    return JsonResponse({"success": True})
+# ------------------------------#
+# ------------------------------#
+#         Member VIEWS
+#-------------------------------#
+# ------------------------------#
 
 @require_POST
 @login_required
@@ -483,6 +541,66 @@ def add_member(request, board_id):
         pass 
         
     return redirect("board_detail", board_id=board.id)
+
+@login_required
+@require_POST
+def remove_member(request, board_id, user_id):
+    board = get_object_or_404(Board, id=board_id)
+    
+    # เฉพาะเจ้าของบอร์ดเท่านั้นที่มีสิทธิ์ลบ
+    if request.user != board.created_by:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+
+    user_to_remove = get_object_or_404(User, id=user_id)
+    board.members.remove(user_to_remove)
+    
+    return redirect('board_detail', board_id=board.id)
+
+@login_required
+def respond_invitation(request, invite_id, action):
+    invite = get_object_or_404(BoardInvitation, id=invite_id, recipient=request.user, status='pending')
+    
+    if action == 'accept':
+        invite.status = 'accepted'
+        invite.save()
+        # เพิ่มเข้าบอร์ดจริงๆ
+        invite.board.members.add(request.user)
+    elif action == 'decline':
+        invite.status = 'declined'
+        invite.save()
+        
+    return redirect('project_page') # หรือหน้า inbox ที่เราจะสร้าง
+
+@login_required
+@require_POST
+def create_checklist_item(request, task_id):
+    task = get_object_or_404(Task, id=task_id)
+    
+    # ตรวจสอบสิทธิ์ (ถ้าจำเป็น): เช่น user ต้องอยู่ใน board นี้
+    
+    try:
+        data = json.loads(request.body)
+        content = data.get('content')
+        
+        if content:
+            item = ChecklistItem.objects.create(task=task, content=content)
+            return JsonResponse({
+                'success': True,
+                'id': item.id,
+                'content': item.content,
+                'is_completed': item.is_completed
+            })
+        return JsonResponse({'success': False, 'error': 'No content provided'}, status=400)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+
+# ------------------------------#
+# ------------------------------#
+#         Comment VIEWS
+#-------------------------------#
+# ------------------------------#
 
 @login_required
 def get_comments(request, task_id):
@@ -550,37 +668,13 @@ def add_comment(request, task_id):
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
-@login_required
-@require_POST
-def create_label(request, board_id):
-    board = get_object_or_404(Board, id=board_id)
-    
-    # ตรวจสอบสิทธิ์ว่า user เป็นสมาชิกบอร์ดไหม
-    if request.user not in board.members.all() and board.created_by != request.user:
-        return JsonResponse({'error': 'Permission denied'}, status=403)
 
-    try:
-        data = json.loads(request.body)
-        name = data.get('name')
-        color = data.get('color')
+# ------------------------------#
+# ------------------------------#
+#         seearch VIEWS
+#-------------------------------#
+# ------------------------------#
 
-        if not name or not color:
-             return JsonResponse({'error': 'Missing data'}, status=400)
-
-        # สร้าง Label ใหม่
-        label = Label.objects.create(board=board, name=name, color=color)
-
-        return JsonResponse({
-            'success': True,
-            'id': label.id,
-            'name': label.name,
-            'color': label.color
-        })
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
-
-# board/views.py
-from django.http import JsonResponse # (เช็คดูด้านบนไฟล์ว่ามีหรือยัง)
 
 @login_required
 def search_boards_api(request):
@@ -606,57 +700,6 @@ def search_boards_api(request):
 
     return JsonResponse({'results': results})
 
-@login_required
-@require_POST
-def remove_member(request, board_id, user_id):
-    board = get_object_or_404(Board, id=board_id)
-    
-    # เฉพาะเจ้าของบอร์ดเท่านั้นที่มีสิทธิ์ลบ
-    if request.user != board.created_by:
-        return JsonResponse({'error': 'Permission denied'}, status=403)
-
-    user_to_remove = get_object_or_404(User, id=user_id)
-    board.members.remove(user_to_remove)
-    
-    return redirect('board_detail', board_id=board.id)
-
-@login_required
-def respond_invitation(request, invite_id, action):
-    invite = get_object_or_404(BoardInvitation, id=invite_id, recipient=request.user, status='pending')
-    
-    if action == 'accept':
-        invite.status = 'accepted'
-        invite.save()
-        # เพิ่มเข้าบอร์ดจริงๆ
-        invite.board.members.add(request.user)
-    elif action == 'decline':
-        invite.status = 'declined'
-        invite.save()
-        
-    return redirect('project_page') # หรือหน้า inbox ที่เราจะสร้าง
-
-@login_required
-@require_POST
-def create_checklist_item(request, task_id):
-    task = get_object_or_404(Task, id=task_id)
-    
-    # ตรวจสอบสิทธิ์ (ถ้าจำเป็น): เช่น user ต้องอยู่ใน board นี้
-    
-    try:
-        data = json.loads(request.body)
-        content = data.get('content')
-        
-        if content:
-            item = ChecklistItem.objects.create(task=task, content=content)
-            return JsonResponse({
-                'success': True,
-                'id': item.id,
-                'content': item.content,
-                'is_completed': item.is_completed
-            })
-        return JsonResponse({'success': False, 'error': 'No content provided'}, status=400)
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 @login_required
 @require_POST
@@ -681,8 +724,12 @@ def delete_checklist_item(request, item_id):
     item.delete()
     return JsonResponse({'success': True})
 
+# ------------------------------#
+# ------------------------------#
+#         Attachment VIEWS
+#-------------------------------#
+# ------------------------------#
 
-# --- Attachment Views ---
 @login_required
 @require_POST
 def create_attachment(request, task_id):
@@ -712,6 +759,12 @@ def delete_attachment(request, attachment_id):
     # หมายเหตุ: ปกติ Django จะลบ record ใน DB แต่ไฟล์จริงอาจจะยังอยู่
     # ถ้าอยากให้ลบไฟล์จริงด้วย ต้องใช้ signal หรือ library เสริม (แต่เบื้องต้นแค่นี้ก่อนได้ครับ)
     return JsonResponse({'success': True})
+
+# ------------------------------#
+# ------------------------------#
+#         notifications VIEWS
+#-------------------------------#
+# ------------------------------#
 
 @login_required
 def get_notifications(request):
@@ -769,3 +822,27 @@ def get_archived_tasks(request, board_id):
     } for task in tasks]
 
     return JsonResponse({'tasks': data})
+
+# ==============================#
+# ======= ประวัติกิจกรรม ==========#
+# ==============================#
+
+def log_activity(board, user, action_text):
+    ActivityLog.objects.create(board=board, actor=user, action=action_text)
+
+# API ดึงประวัติกิจกรรม (สำหรับ JavaScript)
+@login_required
+def get_board_activities(request, board_id):
+    board = get_object_or_404(Board, pk=board_id)
+    
+    # ดึง 50 รายการล่าสุด
+    activities = board.activities.select_related('actor').order_by('-created_at')[:50]
+    
+    data = [{
+        'actor': act.actor.username,
+        'actor_initial': act.actor.username[0].upper(), # ตัวอักษรแรกของชื่อ
+        'action': act.action,
+        'created_at': act.created_at.strftime('%d/%m/%Y %H:%M')
+    } for act in activities]
+    
+    return JsonResponse({'activities': data})

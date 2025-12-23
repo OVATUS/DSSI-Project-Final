@@ -80,8 +80,16 @@ window.boardDetailPage = function (config) {
         comments: [],
         newCommentText: '',
         isLoadingComments: false,
+        //  Filter 
+        searchQuery: '',      // เก็บข้อความที่พิมพ์
+        filterMember: '',     // เก็บ ID สมาชิกที่เลือก
+        filterLabel: '',      // เก็บ ID ป้ายกำกับที่เลือก
+        // ประวัติการทำงาน
+        activityDrawerOpen: false,
+        activities: [],
+        isLoadingActivities: false,
+        menuOpen: false,
 
-       
        async loadArchivedTasks(boardId) {
             this.archivedDrawerOpen = true; // เปิดลิ้นชักทันที
             this.isLoadingArchived = true;
@@ -95,6 +103,21 @@ window.boardDetailPage = function (config) {
                 console.error("Error loading archived tasks:", err);
             } finally {
                 this.isLoadingArchived = false;
+            }
+        },
+        async loadActivities(boardId) {
+            this.activityDrawerOpen = true;
+            this.isLoadingActivities = true;
+            this.activities = [];
+
+            try {
+                const res = await fetch(`/board/${boardId}/activities/`);
+                const data = await res.json();
+                this.activities = data.activities || [];
+            } catch (err) {
+                console.error("Error loading activities:", err);
+            } finally {
+                this.isLoadingActivities = false;
             }
         },
 

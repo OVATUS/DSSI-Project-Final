@@ -54,4 +54,7 @@ urlpatterns = [
     path('notifications/', get_notifications, name='get_notifications'),
     path('notifications/<int:notification_id>/read/', mark_notification_read, name='mark_notification_read'),
     path('notifications/read-all/', mark_all_read, name='mark_all_read'),
+
+    # ประวัติการทำงาน
+    path('<int:board_id>/activities/', get_board_activities, name='get_board_activities'),
 ]
