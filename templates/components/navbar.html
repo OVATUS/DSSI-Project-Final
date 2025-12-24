@@ -1,41 +1,71 @@
 <header
   class="fixed top-0 left-0 w-full h-14 z-35 bg-[#0094FF] text-white flex items-center justify-between px-6 shadow-md"
 >
+  {# --- 1. LOGO --- #}
   <div class="text-2xl font-extrabold tracking-wider">
-    <a href="{% url 'home' %}"> WORK WAI D </a>
+    <a href="{% url 'home' %}" class="hover:text-white/90 transition-colors"> WORK WAI D </a>
   </div>
 
-  <div class="flex items-center gap-3">
+  {# --- 2. RIGHT SIDE (Notification + Profile) --- #}
+  <div class="flex items-center gap-4">
+    
+    {# === NOTIFICATION BELL === #}
     <div
-      class="relative mr-4"
+      class="relative"
       x-data="{ 
         open: false, 
         count: 0, 
         notifications: [],
-        fetchNotifications() {
-            fetch('{% url 'get_notifications' %}')
-                .then(res => res.json())
-                .then(data => {
-                    this.count = data.unread_count;
-                    this.notifications = data.notifications;
-                });
+        
+        async fetchNotifications() {
+            try {
+                // เรียก API ดึงข้อมูลแจ้งเตือน (ต้องมี URL นี้ใน urls.py)
+                const res = await fetch('/board/notifications/'); 
+                if (!res.ok) return;
+                const data = await res.json();
+                this.count = data.unread_count;
+                this.notifications = data.notifications;
+            } catch (e) {
+                console.error('Error fetching notifications:', e);
+            }
         },
-        markAsRead(id, boardId) {
-             fetch(`/board/notifications/${id}/read/`, { 
-                 method: 'POST', 
-                 headers: {'X-CSRFToken': '{{ csrf_token }}'} 
-             }).then(() => {
-                 // เมื่อกดอ่าน ให้ redirect ไปที่หน้าบอร์ดนั้น
-                 window.location.href = `/board/${boardId}/`;
-             });
+
+        async markAsRead(id, boardId) {
+             try {
+                 await fetch(`/board/notifications/${id}/read/`, { 
+                     method: 'POST', 
+                     headers: {'X-CSRFToken': '{{ csrf_token }}'} 
+                 });
+                 // ถ้ามี boardId ให้วิ่งไปหน้านั้น
+                 if (boardId) {
+                     window.location.href = `/board/${boardId}/`;
+                 } else {
+                     // ถ้าไม่มี (เช่น แจ้งเตือนระบบ) ให้โหลดข้อมูลใหม่เฉยๆ
+                     this.fetchNotifications();
+                 }
+             } catch (e) {
+                 console.error('Error marking as read:', e);
+             }
+        },
+
+        async markAllRead() {
+            try {
+                await fetch('/board/notifications/mark-all-read/', { 
+                    method: 'POST', 
+                    headers: {'X-CSRFToken': '{{ csrf_token }}'} 
+                });
+                this.count = 0;
+                this.fetchNotifications();
+            } catch (e) {}
         }
-    }"
+      }"
       x-init="fetchNotifications(); setInterval(() => fetchNotifications(), 10000)"
       @click.outside="open = false"
     >
+      {# ปุ่มกระดิ่ง #}
       <button
         @click="open = !open"
-        class="relative p-2 text-white hover:bg-white/10 rounded-full transition-colors"
+        class="relative p-2 text-white hover:bg-white/20 rounded-full transition-colors focus:outline-none"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -52,105 +82,120 @@
           />
         </svg>
 
+        {# จุดแดง (Red Badge) #}
         <span
           x-show="count > 0"
-          x-text="count"
-          class="absolute top-1 right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-[#0094FF]"
+          x-transition.scale
+          x-text="count > 99 ? '99+' : count"
+          class="absolute top-1 right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-[#0094FF] min-w-[1.25rem] text-center shadow-sm"
         ></span>
       </button>
 
+      {# Dropdown List #}
       <div
         x-show="open"
-        x-transition
-        class="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50 text-gray-800"
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="transform opacity-0 scale-95"
+        x-transition:enter-end="transform opacity-100 scale-100"
+        x-transition:leave="transition ease-in duration-75"
+        x-transition:leave-start="transform opacity-100 scale-100"
+        x-transition:leave-end="transform opacity-0 scale-95"
+        class="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50 text-gray-800 origin-top-right"
         style="display: none"
       >
+        {# Dropdown Header #}
         <div
-          class="p-3 border-b border-gray-100 flex justify-between items-center bg-gray-50"
+          class="px-4 py-3 border-b border-gray-100 flex justify-between items-center bg-gray-50/80 backdrop-blur-sm"
         >
           <h3 class="font-bold text-sm text-gray-700">การแจ้งเตือน</h3>
           <button
-            @click="
-                fetch('{% url 'mark_all_read' %}', { method: 'POST', headers: {'X-CSRFToken': '{{ csrf_token }}'} })
-                .then(() => { count = 0; fetchNotifications(); })
-            "
-            class="text-xs text-indigo-600 hover:underline"
+            @click="markAllRead()"
+            x-show="notifications.length > 0"
+            class="text-xs text-indigo-600 hover:text-indigo-800 hover:underline font-medium transition-colors"
           >
             อ่านทั้งหมด
           </button>
         </div>
 
-        <div class="max-h-80 overflow-y-auto">
+        {# Dropdown Body (Scrollable) #}
+        <div class="max-h-[20rem] overflow-y-auto custom-scrollbar bg-white">
           <template x-for="notif in notifications" :key="notif.id">
             <div
               @click="markAsRead(notif.id, notif.board_id)"
-              class="p-3 border-b border-gray-50 hover:bg-indigo-50 cursor-pointer transition-colors flex gap-3 items-start"
-              :class="{'bg-blue-50/50': !notif.is_read}"
+              class="px-4 py-3 border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors flex gap-3 items-start group"
+              :class="{'bg-blue-50/40': !notif.is_read}"
             >
-              <div
-                class="w-8 h-8 rounded-full bg-gray-200 overflow-hidden shrink-0"
-              >
-                <template x-if="notif.actor_avatar">
-                  <img
-                    :src="notif.actor_avatar"
-                    class="w-full h-full object-cover"
-                  />
-                </template>
-                <template x-if="!notif.actor_avatar">
-                  <div
-                    class="w-full h-full bg-indigo-500 flex items-center justify-center text-white text-xs font-bold"
-                    x-text="notif.actor.charAt(0)"
-                  ></div>
-                </template>
+              {# Avatar ผู้กระทำ #}
+              <div class="shrink-0 relative">
+                <div class="w-9 h-9 rounded-full bg-gray-200 overflow-hidden ring-2 ring-white shadow-sm">
+                    <template x-if="notif.actor_avatar">
+                        <img :src="notif.actor_avatar" class="w-full h-full object-cover" />
+                    </template>
+                    <template x-if="!notif.actor_avatar">
+                        <div class="w-full h-full bg-gradient-to-br from-indigo-400 to-indigo-600 flex items-center justify-center text-white text-xs font-bold" x-text="notif.actor ? notif.actor.charAt(0).toUpperCase() : 'S'"></div>
+                    </template>
+                </div>
+                {# Icon เล็กๆ บอกประเภท (Optional) #}
+                <div class="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5">
+                    <div class="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-2.5 w-2.5 text-white" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" /></svg>
+                    </div>
+                </div>
               </div>
 
-              <div class="flex-1">
-                <p class="text-sm">
-                  <span class="font-bold" x-text="notif.actor"></span>
-                  <span x-text="notif.message"></span>
+              {# เนื้อหาแจ้งเตือน #}
+              <div class="flex-1 min-w-0">
+                <p class="text-sm text-gray-800 leading-snug">
+                  <span class="font-bold text-gray-900" x-text="notif.actor"></span>
+                  <span class="text-gray-600" x-text="notif.message"></span>
                 </p>
-                <p
-                  class="text-[10px] text-gray-400 mt-1"
-                  x-text="notif.created_at"
-                ></p>
+                <p class="text-[11px] text-gray-400 mt-1 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <span x-text="notif.created_at"></span>
+                </p>
               </div>
 
-              <div
-                x-show="!notif.is_read"
-                class="w-2 h-2 rounded-full bg-blue-500 mt-2"
-              ></div>
+              {# จุดน้ำเงิน (ถ้ายังไม่อ่าน) #}
+              <div x-show="!notif.is_read" class="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-sm mt-1.5 shrink-0 animate-pulse"></div>
             </div>
           </template>
 
+          {# กรณีไม่มีแจ้งเตือน #}
           <div
             x-show="notifications.length === 0"
-            class="p-4 text-center text-gray-400 text-sm"
+            class="flex flex-col items-center justify-center py-8 text-gray-400"
           >
-            ไม่มีการแจ้งเตือน
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+            <span class="text-sm">ไม่มีการแจ้งเตือนใหม่</span>
           </div>
         </div>
       </div>
     </div>
-    <span class="text-sm font-semibold uppercase"
-      >{{ request.user.username }}</span
-    >
-    <div
-      class="w-8 h-8 rounded-full bg-white overflow-hidden border border-white"
-    >
-      <a href="{% url 'profile' %}" class="block w-full h-full">
-        {% if request.user.profile_image %}
-        <img
-          src="{{ request.user.profile_image.url }}"
-          class="w-full h-full object-cover"
-        />
-        {% else %}
-        <div
-          class="w-full h-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold"
-        >
-          {{ request.user.username|slice:":1"|upper }}
+
+    {# === USER PROFILE === #}
+    <div class="flex items-center gap-3 pl-2 border-l border-white/20 h-8">
+        <span class="text-sm font-semibold uppercase hidden sm:block tracking-wide text-shadow-sm">
+            {{ request.user.username }}
+        </span>
+        <div class="w-9 h-9 rounded-full bg-white p-0.5 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+            <a href="{% url 'profile' %}" class="block w-full h-full rounded-full overflow-hidden relative group">
+                {% if request.user.profile_image %}
+                    <img
+                    src="{{ request.user.profile_image.url }}"
+                    class="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-300"
+                    alt="Profile"
+                    />
+                {% else %}
+                    <div class="w-full h-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-xs font-bold">
+                    {{ request.user.username|slice:":1"|upper }}
+                    </div>
+                {% endif %}
+                
+                {# Overlay ตอน Hover #}
+                <div class="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors"></div>
+            </a>
         </div>
-        {% endif %}
-      </a>
     </div>
+
   </div>
 </header>

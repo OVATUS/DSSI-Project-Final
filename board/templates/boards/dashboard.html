@@ -4,52 +4,11 @@
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
 
     {# ================================================= #}
-    {# 1. กล่องจดหมาย / คำเชิญ (Invitations Box)         #}
+    {# 1. สรุปงานของฉัน (Task Summary) + ตัวกรอง        #}
+    {#    (ย้ายขึ้นมาเป็นส่วนแรก)                         #}
     {# ================================================= #}
-    {% if received_invites %}
-    <div class="bg-white rounded-xl shadow-md border-l-4 border-indigo-500 overflow-hidden">
-        <div class="p-4 bg-indigo-50 border-b border-indigo-100 flex justify-between items-center">
-            <h3 class="text-indigo-900 font-bold flex items-center gap-2">
-                📩 คำเชิญเข้าร่วมโปรเจกต์ใหม่ ({{ received_invites.count }})
-            </h3>
-        </div>
-        <div class="divide-y divide-gray-100">
-            {% for invite in received_invites %}
-            <div class="p-4 flex flex-col sm:flex-row justify-between items-center gap-4 hover:bg-gray-50 transition-colors">
-                <div class="flex items-center gap-3">
-                    {# Avatar คนเชิญ #}
-                    <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
-                        {{ invite.sender.username.0|upper }}
-                    </div>
-                    <div>
-                        <p class="text-gray-800 text-sm">
-                            <span class="font-bold">{{ invite.sender.username }}</span> เชิญคุณเข้าร่วม
-                        </p>
-                        <p class="text-indigo-600 font-bold text-lg leading-tight">
-                            "{{ invite.board.name }}"
-                        </p>
-                    </div>
-                </div>
-                <div class="flex gap-2 w-full sm:w-auto">
-                    <a href="{% url 'respond_invitation' invite.id 'accept' %}" class="flex-1 sm:flex-none text-center bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 shadow-sm transition-all">
-                        ตอบรับ
-                    </a>
-                    <a href="{% url 'respond_invitation' invite.id 'decline' %}" class="flex-1 sm:flex-none text-center bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 hover:text-red-600 transition-all">
-                        ปฏิเสธ
-                    </a>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-    </div>
-    {% endif %}
-
-
-    {# ================================================= #}
-    {# 2. สรุปงานของฉัน (Task Summary) + ตัวกรอง        #}
-    {# ================================================= #}
-    {# ใช้ Alpine.js (x-data) เพื่อทำ Tab Filter #}
-    <div x-data="{ filter: 'all' }"> <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+    <div x-data="{ filter: 'all' }">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
             <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2">
                 <span>⚡</span> งานของฉัน (My Tasks)
             </h2>
@@ -167,39 +126,49 @@
         </div>
     </div>
 
-
     {# ================================================= #}
-    {# 3. รายการบอร์ด (Your Boards) - เหมือนเดิม        #}
+    {# 2. กล่องจดหมาย / คำเชิญ (Invitations Box)         #}
+    {#    (ย้ายลงมาอยู่ใต้ Task Summary)                  #}
     {# ================================================= #}
-    <div>
-        <div class="flex justify-between items-center mb-4 mt-8">
-            <h2 class="text-xl font-bold text-gray-800">📋 โปรเจกต์ทั้งหมด</h2>
-            <a href="{% url 'board_create' %}" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm font-medium shadow-sm transition-colors">
-                + สร้างบอร์ด
-            </a>
+    {% if received_invites %}
+    <div class="bg-white rounded-xl shadow-md border-l-4 border-indigo-500 overflow-hidden">
+        <div class="p-4 bg-indigo-50 border-b border-indigo-100 flex justify-between items-center">
+            <h3 class="text-indigo-900 font-bold flex items-center gap-2">
+                📩 คำเชิญเข้าร่วมโปรเจกต์ใหม่ ({{ received_invites.count }})
+            </h3>
         </div>
-        
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {% for board in boards %}
-            <a href="{% url 'board_detail' board.id %}" class="block group">
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md hover:border-indigo-300 transition-all h-full flex flex-col">
-                    <h3 class="text-lg font-bold text-gray-800 mb-2 group-hover:text-indigo-600 transition-colors">{{ board.name }}</h3>
-                    <p class="text-gray-500 text-sm mb-4 flex-1">{{ board.description|default:"-"|truncatechars:50 }}</p>
-                    <div class="flex items-center justify-between text-xs text-gray-400 mt-auto pt-4 border-t border-gray-100">
-                        <span>Updated: {{ board.created_at|date:"d M" }}</span>
-                        {% if board.members.count > 0 %}
-                        <span class="bg-gray-100 px-2 py-1 rounded-full">👥 {{ board.members.count }}</span>
-                        {% endif %}
+        <div class="divide-y divide-gray-100">
+            {% for invite in received_invites %}
+            <div class="p-4 flex flex-col sm:flex-row justify-between items-center gap-4 hover:bg-gray-50 transition-colors">
+                <div class="flex items-center gap-3">
+                    {# Avatar คนเชิญ #}
+                    <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
+                        {{ invite.sender.username.0|upper }}
+                    </div>
+                    <div>
+                        <p class="text-gray-800 text-sm">
+                            <span class="font-bold">{{ invite.sender.username }}</span> เชิญคุณเข้าร่วม
+                        </p>
+                        <p class="text-indigo-600 font-bold text-lg leading-tight">
+                            "{{ invite.board.name }}"
+                        </p>
                     </div>
                 </div>
-            </a>
-            {% empty %}
-            <div class="col-span-full text-center py-12 bg-white rounded-xl border border-dashed border-gray-300">
-                <p class="text-gray-500">คุณยังไม่มีบอร์ด เริ่มต้นสร้างบอร์ดแรกกันเลย!</p>
+                <div class="flex gap-2 w-full sm:w-auto">
+                    <a href="{% url 'respond_invitation' invite.id 'accept' %}" class="flex-1 sm:flex-none text-center bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 shadow-sm transition-all">
+                        ตอบรับ
+                    </a>
+                    <a href="{% url 'respond_invitation' invite.id 'decline' %}" class="flex-1 sm:flex-none text-center bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 hover:text-red-600 transition-all">
+                        ปฏิเสธ
+                    </a>
+                </div>
             </div>
             {% endfor %}
         </div>
     </div>
+    {% endif %}
+
+    {# ส่วนแสดงโปรเจกต์ทั้งหมด ถูกลบออกไปแล้ว #}
 
 </div>
 {% endblock %}

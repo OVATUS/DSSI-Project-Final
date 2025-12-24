@@ -33,12 +33,16 @@ urlpatterns = [
     path('task/<int:task_id>/attachment/create/', create_attachment, name='create_attachment'),
     path('attachment/<int:attachment_id>/delete/', delete_attachment, name='delete_attachment'),
 
-     # Task 🆕
+     # Task 
     path("task/create/<int:list_id>/", task_create, name="task_create"),
     path("task/<int:task_id>/edit/", task_update, name="task_update"),
     path("task/<int:task_id>/delete/", task_delete, name="task_delete"),
     path("task/move/", task_move, name="task_move"),
+
+    # Label URLs
+    path('label/<int:label_id>/delete/', delete_label, name='delete_label'),
     path('board/<int:board_id>/label/create/', create_label, name='create_label'),
+
     # API สำหรับ Archive/Unarchive Task
    path('task/<int:task_id>/toggle-archive/',toggle_task_archive, name='toggle_task_archive'),
    path('<int:board_id>/archived-tasks/',get_archived_tasks, name='get_archived_tasks'),
@@ -51,9 +55,9 @@ urlpatterns = [
     path("api/search/", search_boards_api, name="search_boards_api"),
 
     # notification
-    path('notifications/', get_notifications, name='get_notifications'),
-    path('notifications/<int:notification_id>/read/', mark_notification_read, name='mark_notification_read'),
-    path('notifications/read-all/', mark_all_read, name='mark_all_read'),
+   path('notifications/', get_notifications, name='get_notifications'),
+    path('notifications/<int:pk>/read/', read_notification, name='read_notification'),
+    path('notifications/mark-all-read/', mark_all_read, name='mark_all_read'),
 
     # ประวัติการทำงาน
     path('<int:board_id>/activities/', get_board_activities, name='get_board_activities'),

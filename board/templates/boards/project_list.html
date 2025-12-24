@@ -2,145 +2,141 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div x-data="projectPage()" class="relative p-4">
+<div x-data="projectPage()" class="relative p-4 sm:p-6 max-w-7xl mx-auto">
 
-  {# --- SEARCH BAR WITH DROPDOWN --- #}
-<div class="flex justify-center mt-4 relative z-30" 
-     x-data="{
-        query: '{{ search_query|default_if_none:""|escapejs }}',
-        results: [],
-        isOpen: false,
-        fetchResults() {
-            if (this.query.length < 1) {
-                this.results = [];
-                this.isOpen = false;
-                return;
-            }
-            // เรียก API ที่เราสร้างไว้
-            fetch(`{% url 'search_boards_api' %}?q=${encodeURIComponent(this.query)}`)
-                .then(res => res.json())
-                .then(data => {
-                    this.results = data.results;
-                    this.isOpen = true;
-                });
-        }
-     }"
-     @click.outside="isOpen = false"
->
-    <form method="get" action="{% url 'project_page' %}" class="w-full max-w-2xl relative">
-      <input
-        type="text"
-        name="q" 
-        x-model="query"
-        @input.debounce.300ms="fetchResults()" 
-        @focus="if(query.length > 0) fetchResults()"
-        placeholder="ค้นหาชื่อโปรเจกต์..."
-        class="w-full py-2 pl-10 pr-4 rounded-full bg-gray-200 outline-none focus:ring-2 focus:ring-blue-400 transition-all border border-transparent focus:bg-white shadow-sm"
-        autocomplete="off"
-      />
-      
-      <button type="submit" class="absolute left-3 top-2.5 text-gray-500 hover:text-blue-600 cursor-pointer bg-transparent border-none p-0">
-          🔍 
-      </button>
-
-      <div 
-        x-show="isOpen && results.length > 0"
-        x-transition:enter="transition ease-out duration-100"
-        x-transition:enter-start="opacity-0 scale-95"
-        x-transition:enter-end="opacity-100 scale-100"
-        class="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden"
-        style="display: none;"
-      >
-        <ul>
-            <template x-for="board in results" :key="board.id">
-                <li>
-                    <a :href="'/board/' + board.id + '/'" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0">
-                        <div class="w-8 h-8 rounded bg-gray-200 overflow-hidden shrink-0">
-                            <template x-if="board.cover">
-                                <img :src="board.cover" class="w-full h-full object-cover">
-                            </template>
-                            <template x-if="!board.cover">
-                                <div class="w-full h-full flex items-center justify-center bg-indigo-100 text-indigo-500 text-xs font-bold">
-                                    <span x-text="board.name.charAt(0).toUpperCase()"></span>
-                                </div>
-                            </template>
-                        </div>
-                        
-                        <div class="flex-1 min-w-0">
-                            <p class="text-sm font-medium text-gray-800 truncate" x-text="board.name"></p>
-                            <p class="text-[10px] text-gray-400">ไปที่โปรเจกต์</p>
-                        </div>
-                    </a>
-                </li>
-            </template>
-        </ul>
-        
-        <button type="submit" class="w-full text-center py-2 text-xs text-blue-600 bg-blue-50 hover:bg-blue-100 font-medium transition-colors">
-            ดูผลลัพธ์ทั้งหมดสำหรับ "<span x-text="query"></span>"
+  {# --- SEARCH BAR --- #}
+  <div class="flex justify-center mt-2 mb-8 relative z-30" 
+       x-data="{
+         query: '{{ search_query|default_if_none:""|escapejs }}',
+         results: [],
+         isOpen: false,
+         fetchResults() {
+             if (this.query.length < 1) {
+                 this.results = [];
+                 this.isOpen = false;
+                 return;
+             }
+             fetch(`{% url 'search_boards_api' %}?q=${encodeURIComponent(this.query)}`)
+                 .then(res => res.json())
+                 .then(data => {
+                     this.results = data.results;
+                     this.isOpen = true;
+                 });
+         }
+       }"
+       @click.outside="isOpen = false"
+  >
+      <form method="get" action="{% url 'project_page' %}" class="w-full max-w-xl relative group">
+        <input
+          type="text"
+          name="q" 
+          x-model="query"
+          @input.debounce.300ms="fetchResults()" 
+          @focus="if(query.length > 0) fetchResults()"
+          placeholder="ค้นหาชื่อโปรเจกต์..."
+          class="w-full py-2.5 pl-11 pr-4 rounded-full bg-white border border-gray-200 outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all shadow-sm group-hover:shadow-md text-sm"
+          autocomplete="off"
+        />
+        <button type="submit" class="absolute left-4 top-2.5 text-gray-400 group-focus-within:text-indigo-500 transition-colors cursor-pointer bg-transparent border-none p-0">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
         </button>
-      </div>
-
-    </form>
-</div>
-
-  {# --- SECTION 1: Favorite Projects (Project ที่ติดดาว) --- #}
-  <div class="mt-8">
-    <h2 class="text-lg font-semibold flex items-center gap-2 text-yellow-600">
-        <span>Project ที่ติดดาว</span>
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 fill-current" viewBox="0 0 20 20">
-            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-        </svg>
+  
+        {# Dropdown ผลลัพธ์ #}
+        <div 
+          x-show="isOpen && results.length > 0"
+          x-transition:enter="transition ease-out duration-100"
+          x-transition:enter-start="opacity-0 scale-95"
+          x-transition:enter-end="opacity-100 scale-100"
+          class="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden"
+          style="display: none;"
+        >
+          <ul>
+              <template x-for="board in results" :key="board.id">
+                  <li>
+                      <a :href="'/board/' + board.id + '/'" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0">
+                          <div class="w-8 h-8 rounded bg-gray-200 overflow-hidden shrink-0">
+                              <template x-if="board.cover">
+                                  <img :src="board.cover" class="w-full h-full object-cover">
+                              </template>
+                              <template x-if="!board.cover">
+                                  <div class="w-full h-full flex items-center justify-center bg-indigo-100 text-indigo-500 text-xs font-bold">
+                                      <span x-text="board.name.charAt(0).toUpperCase()"></span>
+                                  </div>
+                              </template>
+                          </div>
+                          <div class="flex-1 min-w-0">
+                              <p class="text-sm font-medium text-gray-800 truncate" x-text="board.name"></p>
+                              <p class="text-[10px] text-gray-400">ไปที่โปรเจกต์</p>
+                          </div>
+                      </a>
+                  </li>
+              </template>
+          </ul>
+          <button type="submit" class="w-full text-center py-2 text-xs text-indigo-600 bg-indigo-50 hover:bg-indigo-100 font-medium transition-colors">
+              ดูผลลัพธ์ทั้งหมดสำหรับ "<span x-text="query"></span>"
+          </button>
+        </div>
+      </form>
+  </div>
+  
+  {# --- SECTION 1: Favorite Projects --- #}
+  <div class="mt-6">
+    <h2 class="text-base font-bold flex items-center gap-2 text-gray-800 mb-3">
+        <span class="text-yellow-500">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 fill-current" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+        </span>
+        Project ที่ติดดาว
     </h2>
-    <hr class="border-gray-300 mt-2 mb-4" />
-
+    
     {% if starred_boards %}
-      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
         {% for board in starred_boards %}
-          {# ✅ ใช้ Component เดียวกัน เพื่อให้มีปุ่มดาวและดีไซน์เหมือนกัน #}
           {% include "boards/components/board_card.html" with board=board %}
         {% endfor %}
       </div>
     {% else %}
-      <div class="text-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+      <div class="text-center py-6 bg-gray-50/50 rounded-xl border border-dashed border-gray-200">
           <p class="text-sm text-gray-500">คุณยังไม่มีโปรเจกต์ที่ติดดาว</p>
-          <p class="text-xs text-gray-400 mt-1">กดที่รูปดาวบนการ์ดเพื่อเพิ่มรายการโปรดที่นี่</p>
       </div>
     {% endif %}
   </div>
+  
+  {# --- SECTION 2: My Projects --- #}
+  <div class="mt-8">
+    <div class="flex items-center justify-between mb-3 border-b border-gray-100 pb-2">
+        <div class="flex items-center gap-3">
+            <h2 class="text-base font-bold text-gray-700 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                My Projects
+            </h2>
+            <span class="text-xs text-gray-400 font-medium bg-gray-100 px-2 py-0.5 rounded-full">{{ boards.count }}</span>
+        </div>
 
-  {# --- SECTION 2: My Projects (โปรเจกต์ทั้งหมด) --- #}
-  <div class="mt-10">
-    <h2 class="text-lg font-semibold text-gray-700">My Project</h2>
-    <hr class="border-gray-300 mt-2 mb-4" />
-
-    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        {# ✅ ย้ายปุ่มสร้างมาไว้ตรงนี้ #}
+        <button
+            type="button"
+            @click="openCreate = true"
+            class="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-lg shadow-sm transition-colors"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+            สร้างใหม่
+        </button>
+    </div>
+  
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
       
-      {# วนลูปแสดงบอร์ดทั้งหมด #}
+      {# วนลูปแสดงบอร์ดทั้งหมด (ไม่ต้องมีปุ่มสร้างท้ายสุดแล้ว) #}
       {% for board in boards %}
         {% include "boards/components/board_card.html" with board=board %}
       {% endfor %}
-
-      {# การ์ดปุ่มสร้างโปรเจกต์ (อยู่ท้ายสุด) #}
-      <button
-        type="button"
-        @click="openCreate = true"
-        class="flex flex-col items-center justify-center bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg h-full min-h-[180px] hover:bg-white hover:border-indigo-400 hover:text-indigo-600 text-gray-500 transition-all duration-200 group"
-      >
-        <div class="w-12 h-12 rounded-full bg-gray-200 group-hover:bg-indigo-100 flex items-center justify-center mb-2 transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-            </svg>
-        </div>
-        <span class="font-medium text-sm">สร้างบอร์ดใหม่</span>
-      </button>
-
+  
     </div>
   </div>
-
+  
   {# --- POPUPS --- #}
   {% include "boards/components/popup_create_board.html" %}
   {% include "boards/components/popup_edit_board.html" %}
   {% include "boards/components/popup_delete_board.html" %}
-
+  
 </div>
 {% endblock %}

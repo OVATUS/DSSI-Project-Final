@@ -2,22 +2,21 @@
 
 <div 
   class="relative group bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden border border-gray-200 flex flex-col h-full"
-  {# 1. ตรวจสอบว่า User ปัจจุบันติดดาวบอร์ดนี้หรือยัง #}
   x-data="{ starred: {% if request.user in board.starred_by.all %}true{% else %}false{% endif %} }"
 >
   
-  {# --- ส่วนรูปปก (Cover Image) --- #}
-  <a href="{% url 'board_detail' board.id %}" class="block h-32 bg-gray-200 relative shrink-0">
+  {# --- ส่วนรูปปก (Cover Image) - ลดความสูงลง --- #}
+  {# 🔻 แก้จาก h-32 เป็น h-24 #}
+  <a href="{% url 'board_detail' board.id %}" class="block h-24 bg-gray-200 relative shrink-0">
      {% if board.cover_image %}
        <img src="{{ board.cover_image.url }}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
      {% else %}
-       {# Fallback: ถ้าไม่มีรูป ให้โชว์สีพื้นหลัง #}
        <div class="w-full h-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
-          <span class="text-4xl opacity-20">🗂️</span>
+          <span class="text-3xl opacity-20">🗂️</span> {# ลดขนาด icon นิดหน่อย #}
        </div>
      {% endif %}
 
-     {# ⭐ 2. ปุ่มดาว (Overlay มุมขวาบน) ⭐ #}
+     {# ปุ่มดาว #}
      <button 
         type="button"
         @click.prevent="
@@ -26,44 +25,41 @@
                 headers: { 'X-CSRFToken': '{{ csrf_token }}' }
             })
             .then(res => res.json())
-            .then(data => { 
-                starred = data.is_starred; 
-                {# ถ้าอยากให้รีโหลดหน้าจอทันทีที่กด (เพื่อให้รายการโปรดย้ายที่) ให้ uncomment บรรทัดล่าง #}
-                {# if (!starred) window.location.reload(); #}
-            })
+            .then(data => { starred = data.is_starred; })
         "
-        class="absolute top-2 right-2 p-1.5 rounded-full shadow-sm transition-all duration-200 z-10 transform scale-90 hover:scale-110"
+        class="absolute top-1.5 right-1.5 p-1 rounded-full shadow-sm transition-all duration-200 z-10 transform scale-90 hover:scale-110"
         :class="starred ? 'bg-yellow-100 text-yellow-500 hover:bg-yellow-200' : 'bg-white/80 text-gray-400 hover:bg-white hover:text-yellow-400'"
         title="ติดดาว / ยกเลิกดาว"
      >
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" :fill="starred ? 'currentColor' : 'none'" viewBox="0 0 24 24" stroke="currentColor">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" :fill="starred ? 'currentColor' : 'none'" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
         </svg>
      </button>
   </a>
 
   {# --- ส่วนเนื้อหาการ์ด --- #}
-  <div class="p-4 flex-1 flex flex-col">
+  {# 🔻 แก้จาก p-4 เป็น p-3 (ลด Padding) #}
+  <div class="p-3 flex-1 flex flex-col">
     <a href="{% url 'board_detail' board.id %}" class="block group-hover:text-indigo-600 transition-colors">
-        <h3 class="font-bold text-gray-800 truncate text-base mb-1">{{ board.name }}</h3>
+        <h3 class="font-bold text-gray-800 truncate text-sm mb-1">{{ board.name }}</h3>
     </a>
     
-    <p class="text-xs text-gray-500 line-clamp-2 min-h-[2.5em] mb-4">
-        {{ board.description|default:"ไม่มีรายละเอียดเพิ่มเติม" }}
+    {# ตัดคำบรรยายให้สั้นลงอีกนิด #}
+    <p class="text-[11px] text-gray-500 line-clamp-2 min-h-[2.2em] mb-2 leading-relaxed">
+        {{ board.description|default:"-" }}
     </p>
     
-    {# Footer ของการ์ด (สมาชิก + ปุ่มแก้ไข) #}
-    <div class="mt-auto pt-3 border-t border-gray-100 flex justify-between items-center">
-        <span class="text-[10px] text-gray-400">
-           {{ board.members.count }} สมาชิก
+    <div class="mt-auto pt-2 border-t border-gray-100 flex justify-between items-center">
+        <span class="text-[10px] text-gray-400 flex items-center gap-1">
+           <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+           {{ board.members.count }}
         </span>
 
-        {# ปุ่มจุดสามจุด (แก้ไข/ลบ) #}
         <div class="relative" x-data="{ openMenu: false }">
             <button 
                 @click.prevent="openMenu = !openMenu" 
                 @click.outside="openMenu = false"
-                class="text-gray-400 hover:text-gray-600 p-1 rounded-md hover:bg-gray-100 transition-colors"
+                class="text-gray-400 hover:text-gray-600 p-0.5 rounded hover:bg-gray-100 transition-colors"
             >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                     <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
@@ -75,11 +71,11 @@
                 x-show="openMenu" 
                 x-cloak
                 x-transition
-                class="absolute right-0 bottom-full mb-1 w-32 bg-white rounded-lg shadow-xl border border-gray-100 z-20 overflow-hidden"
+                class="absolute right-0 bottom-full mb-1 w-28 bg-white rounded shadow-lg border border-gray-100 z-20 overflow-hidden"
             >
                 <button 
                     type="button"
-                    class="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                    class="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                     @click.prevent="
                         menuBoardId = null;
                         openEdit = true;
@@ -95,7 +91,7 @@
                 
                 <button 
                     type="button"
-                    class="w-full text-left px-4 py-2 text-xs text-red-600 hover:bg-red-50 flex items-center gap-2"
+                    class="w-full text-left px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 flex items-center gap-2"
                     @click.prevent="
                         menuBoardId = {{ board.id }};
                         deleteUrl = '{% url 'board_delete' board.id %}'; 

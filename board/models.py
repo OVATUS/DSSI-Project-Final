@@ -186,7 +186,8 @@ class Attachment(models.Model):
 class Notification(models.Model):
     recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications') # ผู้รับแจ้งเตือน
     actor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='triggered_notifications') # ผู้กระทำ (เช่น คนที่ assign)
-    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='notifications') # งานที่เกี่ยวข้อง
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='notifications', null=True, blank=True)
+    board = models.ForeignKey(Board, on_delete=models.CASCADE, related_name='notifications', null=True, blank=True)
     message = models.CharField(max_length=255) # ข้อความแจ้งเตือน
     is_read = models.BooleanField(default=False) # อ่านหรือยัง
     created_at = models.DateTimeField(auto_now_add=True)

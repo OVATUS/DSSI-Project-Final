@@ -20,7 +20,7 @@
 >
 
   {# 2️⃣ Layout ชั้นใน: ส่วนแสดงผลบอร์ด (ใส่ Fixed & Overflow ตรงนี้) #}
-  <div class="fixed inset-0 top-14 w-full h-[calc(100vh-3.5rem)] flex flex-col bg-gradient-to-br from-slate-50 to-slate-200 overflow-hidden">
+  <div class=" top-14 w-full h-[calc(100vh-3.5rem)] flex flex-col   overflow-hidden">
   
       {# --- STYLE Scrollbar --- #}
       <style>
@@ -74,7 +74,17 @@
                     </div>
                     <div class="py-1">
                         <button @click="loadArchivedTasks({{ board.id }}); menuOpen = false" class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-3"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg> คลังที่เก็บ (Archived)</button>
-                        <button @click="activityDrawerOpen = true; menuOpen = false; loadActivities({{ board.id }}); /* 3. แล้วค่อยไปโหลดข้อมูล *" class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-3"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> ประวัติกิจกรรม</button>
+                        <button 
+                          @click="activityDrawerOpen = true; menuOpen = false; loadActivities({{ board.id }});"
+                          class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-3 transition-colors duration-150"
+                      >
+                          {# ไอคอนนาฬิกา (History) #}
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 group-hover:text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          
+                          <span>ประวัติกิจกรรม</span>
+                      </button>
                     </div>
                 </div>
             </div>
@@ -122,20 +132,16 @@
         </div>
       </main>
 
-  </div> {# 🔴 ปิด div ชั้นในตรงนี้ (จุดสำคัญที่สุด!) #}
+  </div> 
 
-  {# 3️⃣ พื้นที่อิสระ (Drawers & Modals) - วางไว้ตรงนี้จะไม่โดนตัดขอบ #}
-  {% include "boards/components/popup_list_form.html" %}
-  {% include "boards/components/popup_list_delete.html" %}
-  {% include "boards/components/popup_add_member.html" %}
-  {% include "boards/components/archive_drawer.html" %}
-  {% include "boards/components/popup_task_form.html" %}
-  
-  {# Activity Drawer (ปรับปรุง UI ให้น่าใช้ขึ้น) #}
+  {# Activity Drawer (แบบสไลด์ข้าง - กลับมาแล้วตามคำขอ!) #}
   <div x-cloak x-show="activityDrawerOpen" class="fixed inset-0 z-50 overflow-hidden" role="dialog" aria-modal="true">
+    {# Backdrop สีดำจางๆ #}
     <div x-show="activityDrawerOpen" x-transition:enter="ease-in-out duration-500" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="ease-in-out duration-500" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="absolute inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="activityDrawerOpen = false"></div>
-    <div class="fixed inset-y-0 right-0 pl-10 max-w-full flex">
-        <div x-show="activityDrawerOpen" x-transition:enter="transform transition ease-in-out duration-500" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0" x-transition:leave="transform transition ease-in-out duration-500" x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full" class="w-screen max-w-md">
+    
+    {# ตัวลิ้นชักสไลด์ #}
+    <div class="fixed inset-y-0 right-0 pl-10 max-w-full flex pointer-events-none"> {# pointer-events-none เพื่อให้กดทะลุพื้นที่ว่างได้ #}
+        <div x-show="activityDrawerOpen" x-transition:enter="transform transition ease-in-out duration-500" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0" x-transition:leave="transform transition ease-in-out duration-500" x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full" class="w-screen max-w-md pointer-events-auto"> {# pointer-events-auto เพื่อให้กดลิ้นชักได้ #}
             <div class="h-full flex flex-col bg-white shadow-xl overflow-hidden">
                 {# Header #}
                 <div class="px-4 py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center shadow-sm z-10">
@@ -146,28 +152,23 @@
                     <button @click="activityDrawerOpen = false" class="text-gray-400 hover:text-gray-600 bg-white hover:bg-gray-100 p-1.5 rounded-full transition-colors shadow-sm border border-gray-200"><svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
                 </div>
                 
-                {# List Body (Timeline Style) #}
+                {# Body List #}
                 <div class="relative flex-1 overflow-y-auto bg-white p-0">
                     <div x-show="isLoadingActivities" class="flex flex-col items-center justify-center h-40 text-gray-400 gap-2">
                         <svg class="animate-spin h-6 w-6 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                        <span class="text-xs">กำลังโหลดข้อมูล...</span>
+                        <span class="text-xs">กำลังโหลด...</span>
                     </div>
                     
                     <div x-show="!isLoadingActivities && activities.length === 0" class="flex flex-col items-center justify-center h-64 text-gray-400 gap-3">
-                        <div class="bg-gray-50 p-4 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
-                        <span class="text-sm">ยังไม่มีกิจกรรมเร็วๆ นี้</span>
+                        <span class="text-sm">ยังไม่มีกิจกรรม</span>
                     </div>
 
                     <ul class="relative" x-show="!isLoadingActivities && activities.length > 0">
                         <template x-for="(act, index) in activities" :key="index">
                             <li class="relative pl-6 pr-4 py-4 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0 group">
-                                {# เส้น Timeline #}
                                 <div class="absolute left-0 top-0 bottom-0 w-1 bg-gray-100 group-hover:bg-indigo-200 transition-colors"></div>
-                                
                                 <div class="flex gap-3 items-start">
-                                    {# Avatar #}
                                     <div class="shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold shadow-sm ring-2 ring-white z-10" x-text="act.actor_initial"></div>
-                                    
                                     <div class="flex-1 min-w-0">
                                         <p class="text-sm text-gray-800 leading-snug">
                                             <span class="font-bold text-gray-900" x-text="act.actor"></span>
@@ -187,6 +188,15 @@
         </div>
     </div>
   </div>
+
+  {# 3️⃣ พื้นที่อิสระ (Drawers & Modals) - วางไว้ตรงนี้จะไม่โดนตัดขอบ #}
+  {% include "boards/components/popup_list_form.html" %}
+  {% include "boards/components/popup_list_delete.html" %}
+  {% include "boards/components/popup_add_member.html" %}
+  {% include "boards/components/archive_drawer.html" %}
+  {% include "boards/components/popup_task_form.html" %}
+  
+    
 
 </div> {# 🟢 ปิด Wrapper นอกสุด #}
 {% endblock %}

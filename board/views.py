@@ -474,6 +474,11 @@ def toggle_task_archive(request, task_id):
         'message': 'Task archived successfully' if task.is_archived else 'Task unarchived successfully'
     })
 
+
+# =========================== #
+#        Label VIEWS          #
+# =========================== #
+
 @login_required
 @require_POST
 def create_label(request, board_id):
@@ -503,12 +508,29 @@ def create_label(request, board_id):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
+@login_required
+@require_POST
+def delete_label(request, label_id):
+    label = get_object_or_404(Label, id=label_id)
+    board = label.board
+    
+    # ตรวจสอบสิทธิ์: ต้องเป็นสมาชิก หรือ เจ้าของบอร์ด ถึงจะลบได้
+    if request.user not in board.members.all() and board.created_by != request.user:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+
+    try:
+        label.delete()
+        return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 # ------------------------------#
 # ------------------------------#
 #         Member VIEWS
 #-------------------------------#
 # ------------------------------#
+
+# board/views.py
 
 @require_POST
 @login_required
@@ -519,12 +541,10 @@ def add_member(request, board_id):
     try:
         user_to_invite = User.objects.get(username=username)
         
-        # เช็คว่าอยู่ในบอร์ดแล้วหรือยัง
+        # ... (โค้ดเช็คเงื่อนไขเดิม) ...
         if user_to_invite in board.members.all() or user_to_invite == board.created_by:
-            # (อาจจะส่ง message บอกว่าอยู่แล้ว)
             pass
         else:
-            # เช็คว่าเคยเชิญไปแล้วและสถานะเป็น Pending ไหม (กันส่งซ้ำ)
             existing_invite = BoardInvitation.objects.filter(
                 board=board, 
                 recipient=user_to_invite, 
@@ -532,16 +552,25 @@ def add_member(request, board_id):
             ).exists()
             
             if not existing_invite:
+                # 1. สร้างคำเชิญ (เหมือนเดิม)
                 BoardInvitation.objects.create(
                     board=board,
                     sender=request.user,
                     recipient=user_to_invite
                 )
+                
+                # 🟢 2. สร้าง Notification (เพิ่มใหม่ตรงนี้!)
+                Notification.objects.create(
+                    recipient=user_to_invite,
+                    actor=request.user,
+                    board=board,  # ระบุบอร์ด
+                    message=f"ได้เชิญคุณเข้าร่วมบอร์ด '{board.name}'"
+                )
+
     except User.DoesNotExist:
         pass 
         
     return redirect("board_detail", board_id=board.id)
-
 @login_required
 @require_POST
 def remove_member(request, board_id, user_id):
@@ -768,36 +797,56 @@ def delete_attachment(request, attachment_id):
 
 @login_required
 def get_notifications(request):
-    notifications = Notification.objects.filter(recipient=request.user).order_by('-created_at')[:10] # เอาแค่ 10 อันล่าสุด
+    """ดึงรายการแจ้งเตือนล่าสุด 10 รายการ"""
+    notifs = Notification.objects.filter(recipient=request.user).order_by('-created_at')[:10]
+    
+    data = []
+    for n in notifs:
+        # 1. จัดการรูปโปรไฟล์
+        avatar_url = None
+        if n.actor and hasattr(n.actor, 'profile_image') and n.actor.profile_image:
+            avatar_url = n.actor.profile_image.url
+
+        # 2. หา Board ID จาก Task (เพราะ Notification ผูกกับ Task)
+        # Model ของคุณคือ Notification -> Task -> List -> Board
+        board_id = None
+        if n.task and n.task.list and n.task.list.board:
+            board_id = n.task.list.board.id
+
+        data.append({
+            'id': n.id,
+            'actor': n.actor.username if n.actor else 'ระบบ',
+            'actor_avatar': avatar_url,
+            'message': n.message,  # ✅ แก้จาก n.verb เป็น n.message
+            'created_at': n.created_at.strftime('%d/%m %H:%M'),
+            'is_read': n.is_read,
+            'board_id': board_id,  # ✅ ดึง ID จาก Task แทน target_board
+        })
+    
     unread_count = Notification.objects.filter(recipient=request.user, is_read=False).count()
     
-    data = [{
-        'id': n.id,
-        'actor': n.actor.username,
-        'actor_avatar': n.actor.profile_image.url if n.actor.profile_image else None,
-        'message': n.message,
-        'task_id': n.task.id,
-        'board_id': n.task.list.board.id,
-        'is_read': n.is_read,
-        'created_at': n.created_at.strftime('%d/%m %H:%M')
-    } for n in notifications]
-    
-    return JsonResponse({'notifications': data, 'unread_count': unread_count})
+    return JsonResponse({
+        'notifications': data,
+        'unread_count': unread_count
+    })
 
 @login_required
-@require_POST
-def mark_notification_read(request, notification_id):
-    notification = get_object_or_404(Notification, id=notification_id, recipient=request.user)
-    notification.is_read = True
-    notification.save()
-    return JsonResponse({'success': True})
+def read_notification(request, pk):
+    """กดอ่านแจ้งเตือนรายตัว"""
+    if request.method == "POST":
+        notif = get_object_or_404(Notification, pk=pk, recipient=request.user)
+        notif.is_read = True
+        notif.save()
+        return JsonResponse({'success': True})
+    return JsonResponse({'success': False}, status=400)
 
 @login_required
-@require_POST
 def mark_all_read(request):
-    Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
-    return JsonResponse({'success': True})
-
+    """กด 'อ่านทั้งหมด'"""
+    if request.method == "POST":
+        Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
+        return JsonResponse({'success': True})
+    return JsonResponse({'success': False}, status=400)
 @login_required
 def get_archived_tasks(request, board_id):
     # 1. แก้ไขการหา Board: ให้เจอทั้ง "คนสร้าง" และ "สมาชิก"

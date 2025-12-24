@@ -1,31 +1,43 @@
-<aside class="w-56 bg-[#2A2A2A] text-gray-200 pt-6">
+<aside class="w-64 bg-[#2A2A2A] text-gray-300 flex flex-col min-h-screen border-r border-gray-800 shadow-xl z-20">
+    
+    {# ส่วน Logo หรือ Header เล็กๆ (Optional) #}
+    <div class="h-16 flex items-center px-6 border-b border-gray-700/50 mb-4">
+        <span class="text-xs font-bold uppercase tracking-wider text-gray-500">Menu</span>
+    </div>
 
     <nav class="flex flex-col gap-2 px-3 text-sm font-medium">
 
+        {# 1. HOME LINK #}
         <a href="{% url 'home' %}"
-           class="flex items-center h-10 px-4 rounded-full
+           class="group flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200
                   {% if request.resolver_match.url_name == 'home' %}
-                      bg-gray-100 text-gray-900 font-semibold
+                      bg-indigo-600 text-white shadow-lg shadow-indigo-900/50
                   {% else %}
-                      hover:bg-gray-700 transition
+                      hover:bg-gray-700/50 hover:text-white
                   {% endif %}
-            ">
-            Home
+           ">
+            {# Icon: Home #}
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 {% if request.resolver_match.url_name == 'home' %}text-white{% else %}text-gray-400 group-hover:text-white{% endif %}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+            </svg>
+            <span>หน้าหลัก (Home)</span>
         </a>
 
-        <a href="{% url 'home' %}"
-           class="flex items-center h-10 px-4 rounded-full hover:bg-gray-700 transition">
-            My Tasks
-        </a>
-
-        <a href=''
-           class="flex items-center h-10 px-4 rounded-full hover:bg-gray-700 transition">
-            Reporting
-        </a>
-
+        {# 2. PROJECT LINK #}
+        {# เช็คว่า URL ปัจจุบันมีคำว่า project หรือ board หรือไม่ เพื่อให้ Active เวลาเข้าไปข้างในบอร์ดด้วย #}
         <a href="{% url 'project_page' %}"
-           class="flex items-center h-10 px-4 rounded-full hover:bg-gray-700 transition">
-            Project
+           class="group flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200
+                  {% if 'project' in request.resolver_match.url_name or 'board' in request.resolver_match.url_name %}
+                      bg-indigo-600 text-white shadow-lg shadow-indigo-900/50
+                  {% else %}
+                      hover:bg-gray-700/50 hover:text-white
+                  {% endif %}
+           ">
+            {# Icon: Folder/Project #}
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 {% if 'project' in request.resolver_match.url_name or 'board' in request.resolver_match.url_name %}text-white{% else %}text-gray-400 group-hover:text-white{% endif %}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            </svg>
+            <span>โปรเจกต์ (Project)</span>
         </a>
 
     </nav>
