@@ -10,7 +10,7 @@
     <div x-data="{ filter: 'all' }">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
             <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2">
-                <span>⚡</span> งานของฉัน (My Tasks)
+                 งานของฉัน (My Tasks)
             </h2>
             
             {# ปุ่มตัวกรอง (Filter Tabs) #}
@@ -69,7 +69,7 @@
                             </td>
                             <td class="px-6 py-4">
                                 <div class="text-xs text-gray-500">
-                                    🏠 {{ item.obj.list.board.name }}
+                                     {{ item.obj.list.board.name }}
                                     <span class="mx-1">/</span>
                                     {{ item.obj.list.title }}
                                 </div>
@@ -88,11 +88,11 @@
                                         {# แสดงวันที่ + สีตามสถานะ #}
                                         {% if item.is_overdue %}
                                             <span class="text-red-600 font-bold flex items-center gap-1">
-                                                ⚠️ {{ item.obj.due_date|date:"d M" }}
+                                                 {{ item.obj.due_date|date:"d M" }}
                                             </span>
                                         {% elif item.is_week %}
                                             <span class="text-orange-500 font-medium flex items-center gap-1">
-                                                🕒 {{ item.obj.due_date|date:"d M" }}
+                                                 {{ item.obj.due_date|date:"d M" }}
                                             </span>
                                         {% else %}
                                             <span class="text-gray-500">
@@ -108,7 +108,7 @@
                         {% empty %}
                         <tr>
                             <td colspan="4" class="px-6 py-8 text-center text-gray-400">
-                                ไม่มีงานค้างในขณะนี้ 🎉
+                                ไม่มีงานค้างในขณะนี้ 
                             </td>
                         </tr>
                         {% endfor %}
@@ -117,10 +117,10 @@
                 
                 {# ข้อความเมื่อกด Filter แล้วไม่เจอข้อมูล (Optional) #}
                 <div x-show="filter === 'overdue' && {{ counts.overdue }} === 0" class="p-8 text-center text-gray-400 bg-white hidden" :class="{'block': true, 'hidden': false}">
-                    👍 ไม่มีงานที่เลยกำหนด
+                     ไม่มีงานที่เลยกำหนด
                 </div>
                  <div x-show="filter === 'week' && {{ counts.week }} === 0" class="p-8 text-center text-gray-400 bg-white hidden" :class="{'block': true, 'hidden': false}">
-                    📅 ไม่มีงานที่ต้องส่งในสัปดาห์นี้
+                     ไม่มีงานที่ต้องส่งในสัปดาห์นี้
                 </div>
             </div>
         </div>
@@ -134,7 +134,7 @@
     <div class="bg-white rounded-xl shadow-md border-l-4 border-indigo-500 overflow-hidden">
         <div class="p-4 bg-indigo-50 border-b border-indigo-100 flex justify-between items-center">
             <h3 class="text-indigo-900 font-bold flex items-center gap-2">
-                📩 คำเชิญเข้าร่วมโปรเจกต์ใหม่ ({{ received_invites.count }})
+                 คำเชิญเข้าร่วมโปรเจกต์ใหม่ ({{ received_invites.count }})
             </h3>
         </div>
         <div class="divide-y divide-gray-100">

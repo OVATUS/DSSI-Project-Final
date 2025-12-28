@@ -15,75 +15,55 @@
   <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" @click="taskModalOpen = false"></div>
 
   {# Modal Panel #}
-  <div class="relative w-full max-w-2xl bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]" @click.stop x-data="{ activeTab: 'details', editDesc: false }">
+  <div class="relative w-full max-w-2xl bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" @click.stop x-data="{ activeTab: 'details', editDesc: false }">
     
-    <form id="taskForm" method="post" :action="taskActionUrl" class="flex flex-col h-full">
+    <form id="taskForm" method="post" :action="taskActionUrl" class="flex flex-col h-full overflow-hidden">
         {% csrf_token %}
 
-        {# --- 1. HEADER (Title) --- #}
-        <div class="px-5 py-4 border-b border-gray-100 flex items-start justify-between shrink-0 bg-white">
-            <div class="w-full mr-4">
-                {# Input หัวข้อ (แบบเนียนไปกับพื้นหลัง) #}
-                <input
-                    type="text" name="title" x-model="taskTitle" required
-                    class="w-full text-lg font-bold text-gray-800 border-none p-0 focus:ring-0 placeholder-gray-400 bg-transparent"
-                    placeholder="ชื่องาน..."
-                />
-                <div class="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                    ในลิสต์ <span class="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium" x-text="taskListTitle"></span>
+        {# --- 1. HEADER --- #}
+        <div class="px-5 pt-4 pb-2 bg-white shrink-0">
+            <div class="flex items-start justify-between">
+                <div class="w-full mr-4">
+                    <input
+                        type="text" name="title" x-model="taskTitle" required
+                        class="w-full text-xl font-bold text-gray-800 border-none p-0 focus:ring-0 placeholder-gray-400 bg-transparent"
+                        placeholder="ชื่องาน..."
+                    />
+                    <div class="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                        ในลิสต์ <span class="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium" x-text="taskListTitle"></span>
+                    </div>
                 </div>
+                <button type="button" class="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded-full transition-colors" @click="taskModalOpen = false">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
             </div>
-            <button type="button" class="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded-full transition-colors" @click="taskModalOpen = false">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
         </div>
 
-       {# --- 2. TABS & TOOLBAR (Compact Metadata) --- #}
-        <div class="px-5 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between shrink-0 gap-2 overflow-x-auto custom-scrollbar">
-            
-            {# Left: Tabs #}
-            <div class="flex gap-1 bg-gray-200/50 p-1 rounded-lg shrink-0">
-                <button type="button" @click="activeTab = 'details'" :class="activeTab === 'details' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'" class="px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 011.414.586l5.414 5.414a1 1 0 01.586 1.414V19a2 2 0 01-2 2z" /></svg>
-                    รายละเอียด
-                </button>
-                <button type="button" @click="activeTab = 'activity'" :class="activeTab === 'activity' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'" class="px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 relative">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
-                    คอมเมนต์
-                    <span x-show="comments.length > 0" class="absolute top-1 right-1 w-1.5 h-1.5 bg-red-500 rounded-full"></span>
-                </button>
-            </div>
-
-            {# Right: Quick Actions #}
-            <div class="flex items-center gap-2 shrink-0">
-                
-                {# ✅ แก้ไขส่วน Due Date (แบบแต่ง Input โดยตรง กดติดแน่นอน) #}
-                <div class="relative group" title="กำหนดส่ง">
-                    {# ไอคอนวางซ้อนอยู่ด้านบน (คลิกทะลุได้ด้วย pointer-events-none) #}
-                    <div class="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none z-10">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-gray-400 group-hover:text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                    </div>
-                    {# ตัว Input จริงๆ #}
-                    <input 
-                        type="datetime-local" 
-                        name="due_date" 
-                        x-model="taskDueDate" 
-                        class="text-xs bg-white border border-gray-200 rounded py-1.5 pl-7 pr-2 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer text-gray-600 h-8 hover:border-indigo-300 transition-colors w-auto"
-                    />
+        {# --- 2. META BAR --- #}
+        <div class="px-5 py-3 bg-gray-50 border-y border-gray-100 flex flex-wrap items-center gap-3 shrink-0">
+            {# Due Date #}
+            <div class="relative group flex items-center bg-white border border-gray-200 rounded-md hover:border-indigo-300 transition-colors shadow-sm">
+                <div class="pl-2 pr-1 text-gray-400 pointer-events-none">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                 </div>
-                
-                {# Priority #}
-                <select name="priority" x-model="taskPriority" class="text-xs bg-white border border-gray-200 rounded py-1.5 pl-2 pr-6 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer text-gray-600 h-8">
+                <input type="datetime-local" name="due_date" x-model="taskDueDate" class="text-xs bg-transparent border-none focus:ring-0 text-gray-700 h-8 py-0 pl-1 pr-2 w-auto cursor-pointer font-medium" />
+            </div>
+            
+            {# Priority #}
+            <div class="relative flex items-center bg-white border border-gray-200 rounded-md hover:border-indigo-300 transition-colors shadow-sm px-2 h-8">
+                 <span class="text-xs text-gray-400 mr-1">ระดับ:</span>
+                <select name="priority" x-model="taskPriority" class="text-xs bg-transparent border-none focus:ring-0 text-gray-700 p-0 font-medium cursor-pointer">
                     {% for value, label in priority_choices %}
                     <option value="{{ value }}">{{ label }}</option>
                     {% endfor %}
                 </select>
+            </div>
 
-                {# Assignee #}
-                <select name="assigned_to" x-model="taskAssignedTo" class="text-xs bg-white border border-gray-200 rounded py-1.5 pl-2 pr-6 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer text-gray-600 max-w-[100px] h-8">
-                    <option value="">(ไม่มีผู้รับผิดชอบ)</option>
+            {# Assignee #}
+            <div class="relative flex items-center bg-white border border-gray-200 rounded-md hover:border-indigo-300 transition-colors shadow-sm px-2 h-8">
+                <span class="text-xs text-gray-400 mr-1">ผู้ดูแล:</span>
+                <select name="assigned_to" x-model="taskAssignedTo" class="text-xs bg-transparent border-none focus:ring-0 text-gray-700 p-0 font-medium cursor-pointer max-w-[100px]">
+                    <option value="">(ว่าง)</option>
                     {% for u in users %}
                     <option value="{{ u.id }}">{{ u.username }}</option>
                     {% endfor %}
@@ -91,179 +71,200 @@
             </div>
         </div>
 
-        {# --- 3. BODY CONTENT (Scrollable) --- #}
-        <div class="flex-1 overflow-y-auto bg-white custom-scrollbar p-5">
+        {# --- 3. TABS NAVIGATION --- #}
+        <div class="px-5 pt-2 border-b border-gray-200 flex items-end gap-4 shrink-0 bg-white overflow-x-auto custom-scrollbar">
+            <button type="button" @click="activeTab = 'details'" class="pb-2 text-xs sm:text-sm font-bold border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap" :class="activeTab === 'details' ? 'text-indigo-600 border-indigo-600' : 'text-gray-500 border-transparent hover:text-gray-700'">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 011.414.586l5.414 5.414a1 1 0 01.586 1.414V19a2 2 0 01-2 2z" /></svg> รายละเอียด
+            </button>
+            <button type="button" @click="activeTab = 'checklist'" class="pb-2 text-xs sm:text-sm font-bold border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap relative" :class="activeTab === 'checklist' ? 'text-indigo-600 border-indigo-600' : 'text-gray-500 border-transparent hover:text-gray-700'">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg> เช็คลิสต์
+                <span x-show="checklistItems.length > 0" class="text-[9px] bg-gray-100 text-gray-500 px-1 roundeคd-full" x-text="checklistItems.length"></span>
+            </button>
+            <button type="button" @click="activeTab = 'attachments'" class="pb-2 text-xs sm:text-sm font-bold border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap relative" :class="activeTab === 'attachments' ? 'text-indigo-600 border-indigo-600' : 'text-gray-500 border-transparent hover:text-gray-700'">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg> ไฟล์แนบ
+                <span x-show="attachmentItems.length > 0" class="text-[9px] bg-gray-100 text-gray-500 px-1 rounded-full" x-text="attachmentItems.length"></span>
+            </button>
+            <button type="button" @click="activeTab = 'activity'" class="pb-2 text-xs sm:text-sm font-bold border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap relative" :class="activeTab === 'activity' ? 'text-indigo-600 border-indigo-600' : 'text-gray-500 border-transparent hover:text-gray-700'">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg> กิจกรรม
+                <span x-show="comments.length > 0" class="w-1.5 h-1.5 bg-red-500 rounded-full mb-2"></span>
+            </button>
+        </div>
+
+        {# ==================================================== #}
+        {# 4. BODY CONTENT (Scrollable & min-h-0)               #}
+        {# ==================================================== #}
+        {# ✅ เพิ่ม min-h-0 ตรงนี้ ช่วยแก้ปัญหา flex overflow #}
+        <div class="flex-1 overflow-y-auto bg-white custom-scrollbar p-5 min-h-0">
             
-            {# ========== TAB 1: DETAILS ========== #}
+            {# ▶▶▶ TAB 1: DETAILS ◀◀◀ #}
             <div x-show="activeTab === 'details'" class="space-y-6">
-                
                 {# Description #}
                 <div class="group">
-                    <div class="flex justify-between items-center mb-2">
-                        <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wide flex items-center gap-1">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path></svg>
-                            รายละเอียด
-                        </h4>
+                    <div class="flex justify-between items-center mb-1">
+                        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wide">รายละเอียด</h4>
                         <button type="button" x-show="!editDesc && taskDescription" @click="editDesc = true" class="text-xs text-indigo-600 hover:underline">แก้ไข</button>
                     </div>
-
-                    <div x-show="!editDesc" @click="editDesc = true" class="cursor-pointer min-h-[60px] rounded-lg border border-transparent hover:border-gray-200 hover:bg-gray-50 p-3 transition-all">
+                    <div x-show="!editDesc" @click="editDesc = true" class="cursor-pointer min-h-[60px] rounded-lg border border-transparent hover:border-gray-200 hover:bg-gray-50 p-2 -ml-2 transition-all">
                         <p x-show="taskDescription" x-text="taskDescription" class="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed"></p>
-                        <p x-show="!taskDescription" class="text-sm text-gray-400 italic">แตะเพื่อเพิ่มรายละเอียด...</p>
+                        <p x-show="!taskDescription" class="text-sm text-gray-400 italic">เพิ่มรายละเอียด...</p>
                     </div>
-
                     <div x-show="editDesc" class="space-y-2">
-                        <textarea 
-                            name="description" x-model="taskDescription" rows="4" 
-                            class="w-full text-sm border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 p-3"
-                            placeholder="พิมพ์รายละเอียดที่นี่..."
-                        ></textarea>
-                        <div class="flex justify-end gap-2">
-                            <button type="button" @click="editDesc = false" class="text-xs text-gray-500 px-3 py-1 hover:bg-gray-100 rounded">เสร็จสิ้น</button>
-                        </div>
+                        <textarea name="description" x-model="taskDescription" rows="5" class="w-full text-sm border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 p-3" placeholder="พิมพ์รายละเอียดที่นี่..."></textarea>
+                        <div class="flex justify-end gap-2"><button type="button" @click="editDesc = false" class="text-xs text-gray-500 px-3 py-1 hover:bg-gray-100 rounded">เสร็จสิ้น</button></div>
                     </div>
                 </div>
 
-                {# ✅ Labels Section (พร้อมปุ่มสร้างใหม่ + ปุ่มลบ) #}
+                <hr class="border-gray-100">
+
+                {# Labels #}
                 <div x-data="{ showCreateLabel: false, newLabelName: '', newLabelColor: 'bg-blue-500' }">
                     <div class="flex justify-between items-center mb-2">
-                        <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wide flex items-center gap-1">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>
-                            ป้ายกำกับ
-                        </h4>
-                        <button type="button" @click="showCreateLabel = !showCreateLabel" class="text-[10px] text-indigo-600 hover:bg-indigo-50 px-2 py-0.5 rounded transition-colors">
-                            <span x-text="showCreateLabel ? 'ยกเลิก' : '+ สร้างใหม่'"></span>
-                        </button>
+                        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wide">ป้ายกำกับ</h4>
+                        <button type="button" @click="showCreateLabel = !showCreateLabel" class="text-[10px] text-indigo-600 hover:bg-indigo-50 px-2 py-0.5 rounded transition-colors"><span x-text="showCreateLabel ? 'ยกเลิก' : '+ สร้างใหม่'"></span></button>
                     </div>
-
-                    {# Create Label Form #}
                     <div x-show="showCreateLabel" class="bg-gray-50 p-3 rounded-lg border border-gray-200 mb-3 space-y-2">
                         <input type="text" x-model="newLabelName" placeholder="ชื่อป้าย..." class="w-full text-xs border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500">
-                        <div class="flex flex-wrap gap-1.5">
-                             <template x-for="color in ['bg-red-500', 'bg-orange-500', 'bg-yellow-400', 'bg-green-500', 'bg-blue-500', 'bg-indigo-500', 'bg-pink-500', 'bg-gray-500']">
-                                <button type="button" @click="newLabelColor = color" class="w-4 h-4 rounded-full border border-white shadow-sm hover:scale-110 transition-all" :class="[color, newLabelColor === color ? 'ring-2 ring-offset-1 ring-gray-400 scale-110' : '']"></button>
-                            </template>
-                        </div>
+                        <div class="flex flex-wrap gap-1.5"><template x-for="color in ['bg-red-500', 'bg-orange-500', 'bg-yellow-400', 'bg-green-500', 'bg-blue-500', 'bg-indigo-500', 'bg-pink-500', 'bg-gray-500']"><button type="button" @click="newLabelColor = color" class="w-4 h-4 rounded-full border border-white shadow-sm hover:scale-110 transition-all" :class="[color, newLabelColor === color ? 'ring-2 ring-offset-1 ring-gray-400 scale-110' : '']"></button></template></div>
                         <button type="button" @click="if(newLabelName) { fetch('{% url 'create_label' board.id %}', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' }, body: JSON.stringify({ name: newLabelName, color: newLabelColor }) }).then(res=>res.json()).then(data=>{ if(data.success){ const container=document.getElementById('label-container'); const html=`<div class='relative group' id='label-item-${data.id}'><label class='cursor-pointer'><input type='checkbox' name='labels' value='${data.id}' class='peer sr-only' checked><div class='px-2.5 py-1 rounded text-[10px] font-bold text-white transition-all ${data.color} ring-1 ring-transparent peer-checked:ring-offset-1 peer-checked:ring-gray-300'>${data.name}</div></label></div>`; container.insertAdjacentHTML('beforeend', html); newLabelName=''; showCreateLabel=false; if(typeof taskLabels!=='undefined') taskLabels.push(data.id); } }) }" class="w-full bg-indigo-600 text-white text-xs font-bold py-1 rounded hover:bg-indigo-700">บันทึก</button>
                     </div>
-
-                    {# List พร้อมปุ่มลบ #}
                     <div id="label-container" class="flex flex-wrap gap-2">
                         {% for label in labels %}
                         <div class="relative group" id="label-item-{{ label.id }}">
-                            {# ตัว Label Checkbox #}
-                            <label class="cursor-pointer">
-                                <input type="checkbox" name="labels" value="{{ label.id }}" x-model="taskLabels" class="peer sr-only">
-                                <div class="px-2.5 py-1 rounded text-[10px] font-bold text-white opacity-30 hover:opacity-80 peer-checked:opacity-100 transition-all {{ label.color }} ring-1 ring-transparent peer-checked:ring-offset-1 peer-checked:ring-gray-300">
-                                    {{ label.name }}
-                                </div>
-                            </label>
-                    
-                            {# ❌ ปุ่มลบ (จะโชว์เมื่อเอาเมาส์ชี้ที่ป้าย) #}
-                            <button type="button" 
-                                    class="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-3.5 h-3.5 flex items-center justify-center text-[8px] opacity-0 group-hover:opacity-100 transition-opacity shadow-sm z-10"
-                                    @click.stop="if(confirm('ลบป้ายนี้?')) { 
-                                        fetch('/board/label/{{ label.id }}/delete/', { 
-                                            method: 'POST', 
-                                            headers: { 'X-CSRFToken': '{{ csrf_token }}' } 
-                                        })
-                                        .then(res => res.json())
-                                        .then(data => { 
-                                            if(data.success) { 
-                                                document.getElementById('label-item-{{ label.id }}').remove(); 
-                                                taskLabels = taskLabels.filter(id => id != {{ label.id }});
-                                            } 
-                                        }); 
-                                    }">
-                                ×
-                            </button>
+                            <label class="cursor-pointer"><input type="checkbox" name="labels" value="{{ label.id }}" x-model="taskLabels" class="peer sr-only"><div class="px-2.5 py-1 rounded text-[10px] font-bold text-white opacity-30 hover:opacity-80 peer-checked:opacity-100 transition-all {{ label.color }} ring-1 ring-transparent peer-checked:ring-offset-1 peer-checked:ring-gray-300">{{ label.name }}</div></label>
+                            <button type="button" class="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-3.5 h-3.5 flex items-center justify-center text-[8px] opacity-0 group-hover:opacity-100 transition-opacity shadow-sm z-10" @click.stop="if(confirm('ลบป้ายนี้?')) { fetch('/board/label/{{ label.id }}/delete/', { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' } }).then(res => res.json()).then(data => { if(data.success) { document.getElementById('label-item-{{ label.id }}').remove(); taskLabels = taskLabels.filter(id => id != {{ label.id }}); } }); }">×</button>
                         </div>
                         {% endfor %}
                     </div>
                 </div>
+            </div>
 
-                {# Checklist #}
+            {# ▶▶▶ TAB 2: CHECKLIST ◀◀◀ #}
+            <div x-show="activeTab === 'checklist'" class="space-y-4 pb-4">
+                <div x-show="taskMode === 'create'" class="text-center py-8 text-gray-400 text-sm">ต้องสร้างการ์ดก่อน จึงจะเพิ่มเช็คลิสต์ได้</div>
                 <div x-show="taskMode === 'edit'">
-                    <div class="flex items-center justify-between mb-2">
-                        <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wide flex items-center gap-1">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                            เช็คลิสต์
-                        </h4>
-                        <span x-show="checklistItems.length > 0" x-text="Math.round((checklistItems.filter(i => i.is_completed).length / checklistItems.length) * 100) + '%'" class="text-[10px] text-gray-400 bg-gray-100 px-1.5 rounded"></span>
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-bold text-gray-700">รายการสิ่งที่ต้องทำ</h3>
+                        <span x-show="checklistItems.length > 0" x-text="Math.round((checklistItems.filter(i => i.is_completed).length / checklistItems.length) * 100) + '%'" class="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-full"></span>
                     </div>
                     
-                    <div class="h-1 w-full bg-gray-100 rounded-full overflow-hidden mb-3" x-show="checklistItems.length > 0">
-                        <div class="h-full bg-green-500 transition-all duration-500" :style="`width: ${checklistItems.length > 0 ? (checklistItems.filter(i => i.is_completed).length / checklistItems.length) * 100 : 0}%`"></div>
+                    <div class="h-2 w-full bg-gray-100 rounded-full overflow-hidden mb-6" x-show="checklistItems.length > 0">
+                        <div class="h-full bg-indigo-500 transition-all duration-500" :style="`width: ${checklistItems.length > 0 ? (checklistItems.filter(i => i.is_completed).length / checklistItems.length) * 100 : 0}%`"></div>
                     </div>
 
-                    <div class="space-y-1 mb-2">
+                    <div class="space-y-3">
                         <template x-for="item in checklistItems" :key="item.id">
-                            <div class="flex items-center gap-2 group hover:bg-gray-50 p-1.5 rounded transition-colors">
-                                <input type="checkbox" x-model="item.is_completed" @change="fetch(`/board/checklist/${item.id}/update/`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json' }, body: JSON.stringify({ is_completed: item.is_completed }) })" class="w-3.5 h-3.5 text-indigo-600 rounded border-gray-300 focus:ring-0 cursor-pointer">
-                                <span x-text="item.content" class="text-sm flex-1 truncate" :class="item.is_completed ? 'text-gray-400 line-through' : 'text-gray-700'"></span>
-                                <button type="button" @click="if(confirm('ลบ?')) { fetch(`/board/checklist/${item.id}/delete/`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' } }).then(res=>res.json()).then(data=>{ if(data.success) checklistItems = checklistItems.filter(i=>i.id!==item.id) }) }" class="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100">×</button>
+                            <div class="flex items-start gap-3 group hover:bg-gray-50 p-2 rounded transition-colors border border-transparent hover:border-gray-200">
+                                <input type="checkbox" x-model="item.is_completed" @change="fetch(`/board/checklist/${item.id}/update/`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json' }, body: JSON.stringify({ is_completed: item.is_completed }) })" class="mt-0.5 w-5 h-5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500 cursor-pointer">
+                                <span x-text="item.content" class="text-sm flex-1 break-words leading-relaxed" :class="item.is_completed ? 'text-gray-400 line-through' : 'text-gray-700'"></span>
+                                <button type="button" @click="if(confirm('ลบ?')) { fetch(`/board/checklist/${item.id}/delete/`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' } }).then(res=>res.json()).then(data=>{ if(data.success) checklistItems = checklistItems.filter(i=>i.id!==item.id) }) }" class="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 px-2"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                             </div>
                         </template>
                     </div>
-                    <div class="flex gap-2">
-                        <input type="text" x-model="newChecklistItem" @keydown.enter.prevent="if(newChecklistItem.trim()) { fetch(`/board/task/${taskId}/checklist/create/`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json' }, body: JSON.stringify({ content: newChecklistItem }) }).then(res=>res.json()).then(data=>{ if(data.success) checklistItems.push({id:data.id, content:data.content, is_completed:data.is_completed}); newChecklistItem=''; }) }" class="flex-1 text-xs border-gray-200 bg-gray-50 focus:bg-white rounded px-2 py-1.5 focus:border-indigo-500 focus:ring-0" placeholder="+ เพิ่มรายการย่อย...">
-                        <button type="button" @click="if(newChecklistItem.trim()) { fetch(`/board/task/${taskId}/checklist/create/`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json' }, body: JSON.stringify({ content: newChecklistItem }) }).then(res=>res.json()).then(data=>{ if(data.success) checklistItems.push({id:data.id, content:data.content, is_completed:data.is_completed}); newChecklistItem=''; }) }" class="text-xs bg-gray-200 px-3 py-1.5 rounded hover:bg-gray-300 text-gray-600">เพิ่ม</button>
+
+                    <div class="mt-4 flex gap-2">
+                        <input type="text" x-model="newChecklistItem" @keydown.enter.prevent="if(newChecklistItem.trim()) { fetch(`/board/task/${taskId}/checklist/create/`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json' }, body: JSON.stringify({ content: newChecklistItem }) }).then(res=>res.json()).then(data=>{ if(data.success) checklistItems.push({id:data.id, content:data.content, is_completed:data.is_completed}); newChecklistItem=''; }) }" class="flex-1 text-sm border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 py-2.5 px-4" placeholder="+ เพิ่มรายการใหม่...">
+                        <button type="button" @click="if(newChecklistItem.trim()) { fetch(`/board/task/${taskId}/checklist/create/`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json' }, body: JSON.stringify({ content: newChecklistItem }) }).then(res=>res.json()).then(data=>{ if(data.success) checklistItems.push({id:data.id, content:data.content, is_completed:data.is_completed}); newChecklistItem=''; }) }" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 rounded-lg text-sm font-bold shadow-sm transition-colors">เพิ่ม</button>
                     </div>
                 </div>
+            </div>
 
-                {# Attachments #}
+            {# ▶▶▶ TAB 3: ATTACHMENTS ◀◀◀ #}
+            <div x-show="activeTab === 'attachments'" class="space-y-4">
+                <div x-show="taskMode === 'create'" class="text-center py-8 text-gray-400 text-sm">ต้องสร้างการ์ดก่อน จึงจะอัปโหลดไฟล์ได้</div>
                 <div x-show="taskMode === 'edit'">
-                    <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1">
-                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
-                        ไฟล์แนบ
-                    </h4>
-                    <div class="grid grid-cols-2 gap-2 mb-2">
+                    
+                    {# ✅ Compact Upload Button (แบบเล็ก ตามคำขอ) #}
+                    <label class="flex items-center justify-center w-full px-4 py-3 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors gap-2 group">
+                        <svg class="w-5 h-5 text-gray-400 group-hover:text-indigo-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                        <span class="text-sm text-gray-500 group-hover:text-indigo-600 font-medium">คลิกเพื่อเพิ่มไฟล์แนบ</span>
+                        <input type="file" class="hidden" @change="if($event.target.files.length > 0) { const formData = new FormData(); formData.append('file', $event.target.files[0]); fetch(`/board/task/${taskId}/attachment/create/`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' }, body: formData }).then(res => res.json()).then(data => { if(data.success) { attachmentItems.unshift({ id: data.id, filename: data.filename, url: data.url, is_image: data.is_image, uploaded_at: data.uploaded_at }); } $event.target.value = ''; }) }">
+                    </label>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
                         <template x-for="file in attachmentItems" :key="file.id">
-                            <div class="flex items-center gap-2 p-1.5 border border-gray-200 rounded hover:bg-gray-50 group">
-                                <div class="w-8 h-8 bg-gray-100 rounded flex items-center justify-center shrink-0 overflow-hidden">
+                            <div class="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:shadow-md transition-shadow group bg-white">
+                                <div class="w-10 h-10 bg-gray-100 rounded-md flex items-center justify-center shrink-0 overflow-hidden">
                                     <template x-if="file.is_image"><img :src="file.url" class="w-full h-full object-cover"></template>
                                     <template x-if="!file.is_image"><span class="text-[9px] font-bold text-gray-400">FILE</span></template>
                                 </div>
-                                <a :href="file.url" target="_blank" x-text="file.filename" class="text-xs text-gray-600 truncate flex-1 hover:text-indigo-600 hover:underline"></a>
-                                <button type="button" @click="if(confirm('ลบ?')) { fetch(`/board/attachment/${file.id}/delete/`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' } }).then(res => res.json()).then(data => { if(data.success) { attachmentItems = attachmentItems.filter(f => f.id !== file.id); } }) }" class="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100">×</button>
+                                <div class="flex-1 min-w-0">
+                                    <a :href="file.url" target="_blank" x-text="file.filename" class="block text-sm font-medium text-gray-700 truncate hover:text-indigo-600 hover:underline"></a>
+                                    <span class="text-xs text-gray-400" x-text="file.uploaded_at"></span>
+                                </div>
+                                <button type="button" @click="if(confirm('ลบไฟล์นี้?')) { fetch(`/board/attachment/${file.id}/delete/`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' } }).then(res => res.json()).then(data => { if(data.success) { attachmentItems = attachmentItems.filter(f => f.id !== file.id); } }) }" class="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 p-2 rounded hover:bg-red-50 transition-all"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                             </div>
                         </template>
                     </div>
-                    <label class="inline-block">
-                        <span class="cursor-pointer text-xs text-indigo-600 hover:underline flex items-center gap-1">+ อัปโหลดไฟล์ <input type="file" class="hidden" @change="if($event.target.files.length > 0) { const formData = new FormData(); formData.append('file', $event.target.files[0]); fetch(`/board/task/${taskId}/attachment/create/`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' }, body: formData }).then(res => res.json()).then(data => { if(data.success) { attachmentItems.unshift({ id: data.id, filename: data.filename, url: data.url, is_image: data.is_image, uploaded_at: data.uploaded_at }); } $event.target.value = ''; }) }"></span>
-                    </label>
                 </div>
             </div>
 
-            {# ========== TAB 2: ACTIVITY / COMMENTS ========== #}
+            {# ▶▶▶ TAB 4: ACTIVITY / COMMENTS ◀◀◀ #}
             <div x-show="activeTab === 'activity'" class="h-full flex flex-col">
-                <div class="flex-1 space-y-3 mb-4">
-                    <div x-show="comments.length === 0" class="text-center py-8 text-gray-400 text-xs">ยังไม่มีการพูดคุย</div>
-                    <template x-for="comment in comments" :key="comment.id">
-                        <div class="flex gap-2.5">
-                            <div class="w-7 h-7 rounded-full bg-gray-200 shrink-0 flex items-center justify-center overflow-hidden text-[10px] font-bold text-gray-500">
-                                <template x-if="comment.author_avatar"><img :src="comment.author_avatar" class="w-full h-full object-cover"></template>
-                                <template x-if="!comment.author_avatar"><span x-text="comment.author.charAt(0).toUpperCase()"></span></template>
-                            </div>
-                            <div class="flex-1">
-                                <div class="flex items-baseline gap-2">
-                                    <span class="text-xs font-bold text-gray-700" x-text="comment.author"></span>
-                                    <span class="text-[10px] text-gray-400" x-text="comment.created_at"></span>
-                                </div>
-                                <div class="text-xs text-gray-600 bg-gray-50 p-2 rounded-lg rounded-tl-none mt-0.5 inline-block" x-text="comment.content"></div>
-                            </div>
+                <div x-show="taskMode === 'create'" class="text-center py-8 text-gray-400 text-sm">ต้องสร้างการ์ดก่อน จึงจะคอมเมนต์ได้</div>
+                
+                <div x-show="taskMode === 'edit'" class="flex-1 flex flex-col h-full min-h-0">
+                    
+                    {# List Comments #}
+                    <div class="flex-1 overflow-y-auto space-y-4 mb-4 pr-1 custom-scrollbar">
+                        <div x-show="comments.length === 0" class="text-center py-12 text-gray-400 text-sm flex flex-col items-center">
+                            <svg class="w-12 h-12 text-gray-200 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+                            ยังไม่มีการพูดคุย
                         </div>
-                    </template>
-                </div>
-                <div class="mt-auto relative">
-                    <input type="text" x-model="newCommentText" @keydown.enter.prevent="postComment()" class="w-full text-xs border-gray-300 rounded-full py-2 pl-3 pr-10 focus:ring-indigo-500 focus:border-indigo-500" placeholder="แสดงความคิดเห็น...">
-                    <button type="button" @click="postComment()" class="absolute right-1 top-1 p-1 text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg></button>
+
+                        <template x-for="(comment, index) in comments" :key="comment.id">
+                            {# ใช้ x-data แยกแต่ละคอมเมนต์เพื่อจัดการสถานะ Edit #}
+                            <div class="flex gap-3 group" x-data="{ editing: false, tempContent: comment.content }">
+                                {# Avatar #}
+                                <div class="w-8 h-8 rounded-full bg-gray-200 shrink-0 flex items-center justify-center overflow-hidden text-[10px] font-bold text-gray-500 shadow-sm border border-white">
+                                    <template x-if="comment.author_avatar"><img :src="comment.author_avatar" class="w-full h-full object-cover"></template>
+                                    <template x-if="!comment.author_avatar"><span x-text="comment.author.charAt(0).toUpperCase()"></span></template>
+                                </div>
+
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-baseline justify-between">
+                                        <div class="flex items-baseline gap-2">
+                                            <span class="text-xs font-bold text-gray-800" x-text="comment.author"></span>
+                                            <span class="text-[10px] text-gray-400" x-text="comment.created_at"></span>
+                                        </div>
+                                        
+                                        {# ปุ่ม Edit/Delete (โชว์เฉพาะเจ้าของคอมเมนต์) #}
+                                        {# เช็คด้วย JS ว่าชื่อคนเม้น ตรงกับ user ปัจจุบันมั้ย #}
+                                        <div x-show="!editing && comment.author === '{{ request.user.username }}'" class="opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+                                            <button type="button" @click="editing = true; tempContent = comment.content" class="text-[10px] text-gray-400 hover:text-indigo-600 cursor-pointer">แก้ไข</button>
+                                            <button type="button" @click="if(confirm('ลบคอมเมนต์นี้?')) { fetch(`/board/comment/${comment.id}/delete/`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' } }).then(res => res.json()).then(data => { if(data.success) { comments = comments.filter(c => c.id !== comment.id); } }) }" class="text-[10px] text-gray-400 hover:text-red-500 cursor-pointer">ลบ</button>
+                                        </div>
+                                    </div>
+
+                                    {# โหมดแสดงผลปกติ #}
+                                    <div x-show="!editing" class="text-sm text-gray-700 bg-gray-50 p-3 rounded-lg rounded-tl-none mt-1 inline-block border border-gray-100 shadow-sm break-words max-w-full" x-text="comment.content"></div>
+
+                                    {# โหมดแก้ไข #}
+                                    <div x-show="editing" class="mt-1">
+                                        <input type="text" x-model="tempContent" 
+                                               @keydown.enter.prevent="fetch(`/board/comment/${comment.id}/update/`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json' }, body: JSON.stringify({ content: tempContent }) }).then(res => res.json()).then(data => { if(data.success) { comment.content = data.content; editing = false; } })"
+                                               class="w-full text-sm border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500 py-1.5 px-3" />
+                                        <div class="flex gap-2 mt-1 text-[10px]">
+                                            <button type="button" @click="fetch(`/board/comment/${comment.id}/update/`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json' }, body: JSON.stringify({ content: tempContent }) }).then(res => res.json()).then(data => { if(data.success) { comment.content = data.content; editing = false; } })" class="text-indigo-600 hover:underline font-bold">บันทึก</button>
+                                            <button type="button" @click="editing = false" class="text-gray-500 hover:underline">ยกเลิก</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    {# Input Post Comment #}
+                    <div class="mt-auto relative shrink-0">
+                        <input type="text" x-model="newCommentText" @keydown.enter.prevent="postComment()" class="w-full text-sm border-gray-300 rounded-full py-3 pl-5 pr-12 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50 focus:bg-white transition-colors shadow-sm" placeholder="แสดงความคิดเห็น...">
+                        <button type="button" @click="postComment()" class="absolute right-2 top-2 p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg></button>
+                    </div>
                 </div>
             </div>
-
         </div>
 
-        {# --- 4. FOOTER --- #}
+        {# ==================================================== #}
+        {# 5. FOOTER (Bottom Action Bar)                        #}
+        {# ==================================================== #}
         <div class="px-5 py-3 bg-gray-50 border-t border-gray-200 flex justify-between items-center shrink-0">
             {# ปุ่มซ้าย: เก็บเข้าคลัง #}
             <button type="button" x-show="taskMode === 'edit'" @click="if(confirm('ย้ายไปคลัง?')) { fetch(`/board/task/${taskId}/archive/`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' } }).then(res => res.json()).then(data => { if(data.success) { window.location.reload(); } }) }" class="text-xs text-gray-400 hover:text-red-500 flex items-center gap-1 transition-colors">

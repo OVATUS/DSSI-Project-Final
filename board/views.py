@@ -697,6 +697,39 @@ def add_comment(request, task_id):
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
+@login_required
+@require_POST
+def update_comment(request, comment_id):
+    comment = get_object_or_404(Comment, id=comment_id)
+    
+    # เช็คว่าเป็นคนเขียนคอมเมนต์หรือไม่
+    if request.user != comment.author:
+        return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
+
+    try:
+        data = json.loads(request.body)
+        new_content = data.get('content', '').strip()
+        if new_content:
+            comment.content = new_content
+            comment.save()
+            return JsonResponse({'success': True, 'content': comment.content})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+    
+    return JsonResponse({'success': False, 'error': 'Empty content'}, status=400)
+
+@login_required
+@require_POST
+def delete_comment(request, comment_id):
+    comment = get_object_or_404(Comment, id=comment_id)
+    
+    # เช็คว่าเป็นคนเขียนคอมเมนต์หรือไม่
+    if request.user != comment.author:
+        return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
+
+    comment.delete()
+    return JsonResponse({'success': True})
+
 
 # ------------------------------#
 # ------------------------------#
@@ -895,3 +928,60 @@ def get_board_activities(request, board_id):
     } for act in activities]
     
     return JsonResponse({'activities': data})
+
+# ==============================#
+# ======= ปฏิทินบอร์ด ==========#
+# ==============================#
+
+
+@login_required
+def global_calendar_view(request):
+    # ดึงรายชื่อบอร์ดทั้งหมดที่ user เป็นสมาชิก หรือ เป็นคนสร้าง (เพื่อเอาไปใส่ Dropdown)
+    boards = Board.objects.filter(
+        Q(created_by=request.user) | Q(members=request.user)
+    ).distinct()
+    
+    return render(request, 'boards/calendar_main.html', {
+        'boards': boards
+    })
+
+@login_required
+def api_calendar_events(request):
+    # รับค่า board_id จาก Dropdown (ถ้ามี)
+    board_id = request.GET.get('board_id')
+    
+    # Base Query: งานของฉัน หรือ งานในบอร์ดที่ฉันอยู่ ที่มีวันกำหนดส่ง
+    tasks = Task.objects.filter(
+        due_date__isnull=False,
+        is_archived=False
+    )
+
+    # Filter 1: กรองตามสิทธิ์ (เฉพาะบอร์ดที่ฉันเกี่ยวข้องเท่านั้น)
+    user_boards = Board.objects.filter(Q(created_by=request.user) | Q(members=request.user))
+    tasks = tasks.filter(list__board__in=user_boards)
+
+    # Filter 2: ถ้ามีการเลือกบอร์ดเจาะจง
+    if board_id and board_id != 'all':
+        tasks = tasks.filter(list__board_id=board_id)
+
+    events = []
+    for task in tasks:
+        # กำหนดสี Event ตาม Priority
+        color = '#3B82F6' # Blue (Medium)
+        if task.priority == 'high':
+            color = '#EF4444' # Red
+        elif task.priority == 'low':
+            color = '#10B981' # Green
+            
+        # ถ้าอยากให้สีต่างตามบอร์ด ก็สามารถใช้ task.list.board.id มาคำนวณสีได้
+
+        events.append({
+            'title': f"[{task.list.board.name}] {task.title}", # ใส่ชื่อบอร์ดนำหน้า
+            'start': task.due_date.isoformat(),
+            'url': f"/board/{task.list.board.id}/?task_id={task.id}", # กดแล้ววิ่งไปหน้าบอร์ดนั้น
+            'backgroundColor': color,
+            'borderColor': color,
+            'allDay': False
+        })
+    
+    return JsonResponse(events, safe=False)

@@ -1,0 +1,154 @@
+{# board/templates/boards/calendar_main.html #}
+{% extends "base.html" %}
+
+{% block content %}
+<div class="h-screen flex flex-col bg-gray-50 overflow-hidden relative">
+
+    {# --- 1. HEADER & FILTER BAR --- #}
+    <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shadow-sm shrink-0 z-20 relative">
+        
+        {# Title #}
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+            </div>
+            <div>
+                <h1 class="text-lg font-bold text-gray-800 leading-tight">ปฏิทินงานรวม</h1>
+                <p class="text-xs text-gray-500">ดูภาพรวมกำหนดการส่งงานทั้งหมดของคุณ</p>
+            </div>
+        </div>
+
+        {# Filter Dropdown #}
+        <div class="flex items-center gap-3">
+            <div class="relative group">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+                </div>
+                <select id="boardFilter" class="pl-9 pr-8 py-2 text-sm bg-gray-50 border border-gray-200 text-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:bg-white transition-colors cursor-pointer shadow-sm min-w-[200px]">
+                    <option value="all">แสดงทุกโปรเจกต์</option>
+                    {% for board in boards %}
+                    <option value="{{ board.id }}">{{ board.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </header>
+
+    {# --- 2. CALENDAR AREA --- #}
+    <div class="flex-1 p-4 sm:p-6 overflow-hidden">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 h-full p-2 sm:p-4 overflow-hidden flex flex-col">
+            {# Calendar Container #}
+            <div id="calendar" class="flex-1"></div>
+        </div>
+    </div>
+
+</div>
+
+{# --- FullCalendar & Scripts --- #}
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var calendarEl = document.getElementById('calendar');
+        var boardFilter = document.getElementById('boardFilter');
+        
+        // 1. Init Calendar
+        var calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek,listWeek'
+            },
+            buttonText: {
+                today: 'วันนี้',
+                month: 'เดือน',
+                week: 'สัปดาห์',
+                list: 'กำหนดการ'
+            },
+            locale: 'th',
+            navLinks: true,
+            editable: false,
+            dayMaxEvents: true, // ถ้า Event เยอะเกินจะซ่อนแล้วขึ้น +more
+            height: '100%', // ให้ความสูงเต็มพื้นที่ Parent
+            
+            // แหล่งข้อมูล Event เริ่มต้น (All)
+            events: '{% url "api_calendar_events" %}?board_id=all',
+
+            // ปรับแต่ง Event UI
+            eventContent: function(arg) {
+                let italicEl = document.createElement('div');
+                italicEl.innerHTML = `
+                    <div class="flex items-center gap-1 overflow-hidden px-1 py-0.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-white shrink-0 opacity-70"></span>
+                        <div class="text-xs font-medium truncate">${arg.event.title}</div>
+                    </div>
+                `;
+                return { domNodes: [italicEl] }
+            }
+        });
+        
+        calendar.render();
+
+        // 2. Filter Logic (เมื่อเปลี่ยน Dropdown)
+        boardFilter.addEventListener('change', function() {
+            var selectedBoardId = this.value;
+            
+            // ลบ Event Source เดิมออก
+            var oldSource = calendar.getEventSources()[0];
+            if (oldSource) {
+                oldSource.remove();
+            }
+
+            // เพิ่ม Event Source ใหม่พร้อม Parameter board_id
+            calendar.addEventSource(
+                `{% url "api_calendar_events" %}?board_id=${selectedBoardId}`
+            );
+        });
+    });
+</script>
+
+{# --- Custom CSS for Calendar Beautification --- #}
+<style>
+    /* ปรับแต่ง Font และสี */
+    .fc { font-family: 'Inter', sans-serif; }
+    .fc-toolbar-title { font-size: 1.25rem !important; font-weight: 800; color: #1f2937; }
+    
+    /* ปุ่มต่างๆ */
+    .fc-button-primary { 
+        background-color: white !important; 
+        border-color: #e5e7eb !important; 
+        color: #4b5563 !important; 
+        font-weight: 600 !important;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        padding: 0.5rem 1rem !important;
+        transition: all 0.2s;
+    }
+    .fc-button-primary:hover { 
+        background-color: #f9fafb !important; 
+        color: #111827 !important;
+        border-color: #d1d5db !important;
+    }
+    .fc-button-active { 
+        background-color: #eef2ff !important; 
+        color: #4f46e5 !important;
+        border-color: #c7d2fe !important;
+    }
+
+    /* ตารางปฏิทิน */
+    .fc-theme-standard td, .fc-theme-standard th { border-color: #f3f4f6; }
+    .fc-col-header-cell-cushion { padding: 8px 0; font-size: 0.85rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+    .fc-daygrid-day-number { color: #374151; font-weight: 500; padding: 8px !important; }
+    .fc-day-today { background-color: #fdf2f8 !important; } /* สีพื้นหลังวันปัจจุบัน (ชมพูจางๆ) */
+
+    /* ตัว Event */
+    .fc-event { 
+        border-radius: 6px; 
+        border: none; 
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05); 
+        margin-bottom: 2px !important;
+        cursor: pointer;
+        transition: transform 0.1s;
+    }
+    .fc-event:hover { transform: scale(1.02); z-index: 10; }
+</style>
+{% endblock %}

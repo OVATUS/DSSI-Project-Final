@@ -50,6 +50,8 @@ urlpatterns = [
     #Comment 
     path("task/<int:task_id>/comments/", get_comments, name="get_comments"),
     path("task/<int:task_id>/comments/add/", add_comment, name="add_comment"),
+    path('comment/<int:comment_id>/update/', update_comment, name='update_comment'),
+    path('comment/<int:comment_id>/delete/', delete_comment, name='delete_comment'),
 
     # API สำหรับ Search 
     path("api/search/", search_boards_api, name="search_boards_api"),
@@ -61,4 +63,8 @@ urlpatterns = [
 
     # ประวัติการทำงาน
     path('<int:board_id>/activities/', get_board_activities, name='get_board_activities'),
+
+    # 1. หน้าปฏิทิน
+    path('my-calendar/', global_calendar_view, name='global_calendar'),
+    path('api/calendar/events/', api_calendar_events, name='api_calendar_events'),
 ]
