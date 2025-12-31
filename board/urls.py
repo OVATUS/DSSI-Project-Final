@@ -12,6 +12,7 @@ urlpatterns = [
     path("<int:board_id>/edit/", board_update, name="board_update"),
     path("<int:board_id>/delete/", board_delete, name="board_delete"),
     path('board/<int:board_id>/archived-tasks/', get_archived_tasks, name='get_archived_tasks'),
+    path('task/<int:task_id>/toggle-complete/', toggle_task_completion, name='task_toggle_complete'),
 
     # Menber
     path("<int:board_id>/add_member/", add_member, name="add_member"),
@@ -67,4 +68,7 @@ urlpatterns = [
     # 1. หน้าปฏิทิน
     path('my-calendar/', global_calendar_view, name='global_calendar'),
     path('api/calendar/events/', api_calendar_events, name='api_calendar_events'),
+
+    # 2. Reporting
+    path('reporting/', reporting_view, name='reporting'),
 ]

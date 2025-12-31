@@ -75,7 +75,18 @@ class Task(models.Model):
         HIGH = "high", "High"
  
     list = models.ForeignKey('List', on_delete=models.CASCADE, related_name="tasks") 
-    
+
+    is_completed = models.BooleanField(default=False)  # สถานะเสร็จสิ้น
+    completed_at = models.DateTimeField(null=True, blank=True) # เวลาที่เสร็จ (ไว้ทำ Report)
+    def save(self, *args, **kwargs):
+        # Logic: ถ้าติ๊กถูก ให้บันทึกเวลา ถ้าติ๊กออก ให้ลบเวลา
+        if self.is_completed and not self.completed_at:
+            from django.utils import timezone
+            self.completed_at = timezone.now()
+        elif not self.is_completed:
+            self.completed_at = None
+        super().save(*args, **kwargs)
+        
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     position = models.IntegerField(default=0)

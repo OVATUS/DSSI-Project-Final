@@ -11,6 +11,9 @@ from django.db.models import Q, Prefetch
 import json
 from django.utils import timezone
 from datetime import timedelta
+from django.db.models import Count
+from django.db.models.functions import TruncDate
+
 
 
 @login_required
@@ -26,18 +29,18 @@ def board_lsit_view(request):
         Q(created_by=request.user) | Q(members=request.user)
     ).distinct()
 
-    # --- 3. ส่วนงานของฉัน (My Tasks) พร้อม Logic ตัวกรอง ---
-    # ดึงงานที่ยังไม่เสร็จทั้งหมด (ไม่จำกัดแค่ 10 อันแล้ว เพราะต้องเอามาทำ Filter)
+    # --- 3. ส่วนงานของฉัน (My Tasks) ---
+    # ✅ แก้ไขตรงนี้: เปลี่ยนจาก exclude(status='done') เป็น filter(is_completed=False)
     all_tasks = Task.objects.filter(
-        assigned_to=request.user
-    ).exclude(
-        status='done'
+        assigned_to=request.user,
+        is_completed=False,  # เอาเฉพาะงานที่ "ยังไม่เสร็จ" (ยังไม่ติ๊กถูก)
+        is_archived=False    # เอาเฉพาะงานที่ "ยังไม่ถูกเก็บเข้าคลัง"
     ).select_related('list__board').order_by('due_date', '-priority')
 
     now = timezone.now()
     next_week = now + timedelta(days=7)
     
-    # เตรียมข้อมูลสำหรับส่งไปหน้าเว็บ (เพื่อให้ Filter ง่าย)
+    # เตรียมข้อมูลสำหรับส่งไปหน้าเว็บ
     task_list_data = []
     
     # ตัวนับจำนวนงาน (Counters)
@@ -56,13 +59,13 @@ def board_lsit_view(request):
             if task.due_date < now:
                 is_overdue = True
                 counts['overdue'] += 1
-            # เช็คว่าอยู่ในสัปดาห์นี้ไหม (ภายใน 7 วันข้างหน้า)
+            # เช็คว่าอยู่ในสัปดาห์นี้ไหม
             elif task.due_date <= next_week:
                 is_week = True
                 counts['week'] += 1
         
         task_list_data.append({
-            'obj': task,          # ตัว Object Task จริงๆ
+            'obj': task,
             'is_overdue': is_overdue,
             'is_week': is_week
         })
@@ -70,8 +73,8 @@ def board_lsit_view(request):
     context = {
         'received_invites': received_invites,
         'boards': boards,
-        'task_list_data': task_list_data, # ส่งไปแบบ List ที่มี flag
-        'counts': counts,                 # ส่งจำนวนนับไปโชว์ที่ปุ่ม
+        'task_list_data': task_list_data,
+        'counts': counts,
     }
     
     return render(request, 'boards/dashboard.html', context)
@@ -202,6 +205,25 @@ def board_delete(request, board_id):
         return redirect("project_page")
 
     return redirect("project_page")
+
+@login_required
+@require_POST
+def toggle_task_completion(request, task_id):
+    task = get_object_or_404(Task, id=task_id)
+    
+    # Check Permission
+    if request.user not in task.list.board.members.all() and request.user != task.list.board.created_by:
+        return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
+
+    # สลับสถานะ True <-> False
+    task.is_completed = not task.is_completed
+    task.save()
+
+    return JsonResponse({
+        'success': True, 
+        'is_completed': task.is_completed,
+        'completed_at': task.completed_at
+    })
 
 # ------------------------------#
 # ------------------------------#
@@ -985,3 +1007,79 @@ def api_calendar_events(request):
         })
     
     return JsonResponse(events, safe=False)
+
+# =============================#
+# ======= Reporting Views =======#
+# =============================#
+
+@login_required
+def reporting_view(request):
+    # ... (ส่วน Filter บอร์ด เหมือนเดิมเป๊ะ) ...
+    user_boards = Board.objects.filter(Q(created_by=request.user) | Q(members=request.user)).distinct()
+    tasks = Task.objects.filter(list__board__in=user_boards, is_archived=False)
+
+    selected_board_id = request.GET.get('board_id')
+    if selected_board_id and selected_board_id != 'all':
+        tasks = tasks.filter(list__board_id=selected_board_id)
+        current_board_name = user_boards.filter(id=selected_board_id).first().name
+    else:
+        current_board_name = "ทุกโปรเจกต์"
+
+    # --- ส่วนที่แก้: เตรียม QuerySet สำหรับ List แต่ละประเภท ---
+    
+    # 1. งานทั้งหมด
+    all_tasks_qs = tasks.select_related('list__board', 'assigned_to').order_by('-created_at')
+    
+    # 2. งานที่เสร็จแล้ว
+    completed_tasks_qs = tasks.filter(is_completed=True).select_related('list__board', 'assigned_to').order_by('-completed_at')
+    
+    # 3. งานล่าช้า
+    overdue_tasks_qs = tasks.filter(due_date__lt=timezone.now(), is_completed=False).select_related('list__board', 'assigned_to').order_by('due_date')
+
+    # ตัวเลข KPI
+    total_tasks = tasks.count()
+    completed_tasks = completed_tasks_qs.count()
+    completion_rate = round((completed_tasks / total_tasks * 100), 1) if total_tasks > 0 else 0
+    overdue_tasks = overdue_tasks_qs.count()
+
+    # ... (ส่วน Priority Data และ Trend Data เหมือนเดิม) ...
+    # Chart 1: Priority
+    priority_data = {
+        'high': tasks.filter(priority='high', is_completed=False).count(),
+        'medium': tasks.filter(priority='medium', is_completed=False).count(),
+        'low': tasks.filter(priority='low', is_completed=False).count(),
+    }
+
+    # Chart 2: Trend
+    last_7_days = timezone.now() - timedelta(days=7)
+    completed_trend = (
+        tasks.filter(is_completed=True, completed_at__gte=last_7_days)
+        .annotate(date=TruncDate('completed_at'))
+        .values('date')
+        .annotate(count=Count('id'))
+        .order_by('date')
+    )
+    trend_labels = [item['date'].strftime('%d/%m') for item in completed_trend]
+    trend_data = [item['count'] for item in completed_trend]
+
+    context = {
+        'boards': user_boards,
+        'selected_board_id': selected_board_id,
+        'current_board_name': current_board_name,
+        
+        'total_tasks': total_tasks,
+        'completed_tasks': completed_tasks,
+        'completion_rate': completion_rate,
+        'overdue_tasks': overdue_tasks,
+        
+        # ✅ ส่ง QuerySet ไปด้วย เพื่อเอาไปแสดงใน Modal
+        'all_tasks_qs': all_tasks_qs,
+        'completed_tasks_qs': completed_tasks_qs,
+        'overdue_tasks_qs': overdue_tasks_qs,
+
+        'priority_data': priority_data,
+        'trend_labels': trend_labels,
+        'trend_data': trend_data,
+    }
+
+    return render(request, 'boards/reporting.html', context)

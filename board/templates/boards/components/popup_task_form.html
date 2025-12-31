@@ -9,7 +9,7 @@
   x-transition:leave="transition ease-in duration-150"
   x-transition:leave-start="opacity-100 scale-100"
   x-transition:leave-end="opacity-0 scale-95"
-  class="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6"
+  class="fixed inset-0 z-60 flex items-center justify-center p-4 sm:p-6"
 >
   {# Backdrop #}
   <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" @click="taskModalOpen = false"></div>
@@ -155,7 +155,7 @@
                         <template x-for="item in checklistItems" :key="item.id">
                             <div class="flex items-start gap-3 group hover:bg-gray-50 p-2 rounded transition-colors border border-transparent hover:border-gray-200">
                                 <input type="checkbox" x-model="item.is_completed" @change="fetch(`/board/checklist/${item.id}/update/`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json' }, body: JSON.stringify({ is_completed: item.is_completed }) })" class="mt-0.5 w-5 h-5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500 cursor-pointer">
-                                <span x-text="item.content" class="text-sm flex-1 break-words leading-relaxed" :class="item.is_completed ? 'text-gray-400 line-through' : 'text-gray-700'"></span>
+                                <span x-text="item.content" class="text-sm flex-1 wrap-break-word leading-relaxed" :class="item.is_completed ? 'text-gray-400 line-through' : 'text-gray-700'"></span>
                                 <button type="button" @click="if(confirm('ลบ?')) { fetch(`/board/checklist/${item.id}/delete/`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' } }).then(res=>res.json()).then(data=>{ if(data.success) checklistItems = checklistItems.filter(i=>i.id!==item.id) }) }" class="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 px-2"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                             </div>
                         </template>
@@ -236,7 +236,7 @@
                                     </div>
 
                                     {# โหมดแสดงผลปกติ #}
-                                    <div x-show="!editing" class="text-sm text-gray-700 bg-gray-50 p-3 rounded-lg rounded-tl-none mt-1 inline-block border border-gray-100 shadow-sm break-words max-w-full" x-text="comment.content"></div>
+                                    <div x-show="!editing" class="text-sm text-gray-700 bg-gray-50 p-3 rounded-lg rounded-tl-none mt-1 inline-block border border-gray-100 shadow-sm wrap-break-word max-w-full" x-text="comment.content"></div>
 
                                     {# โหมดแก้ไข #}
                                     <div x-show="editing" class="mt-1">
