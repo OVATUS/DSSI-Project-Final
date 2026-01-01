@@ -1,18 +1,18 @@
-{# templates/boards/components/board_card.html #}
+{# board/templates/boards/components/board_card.html #}
 
 <div 
   class="relative group bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden border border-gray-200 flex flex-col h-full"
   x-data="{ starred: {% if request.user in board.starred_by.all %}true{% else %}false{% endif %} }"
 >
   
-  {# --- ส่วนรูปปก (Cover Image) - ลดความสูงลง --- #}
-  {# 🔻 แก้จาก h-32 เป็น h-24 #}
+  {# --- ส่วนรูปปก (Cover Image) --- #}
   <a href="{% url 'board_detail' board.id %}" class="block h-24 bg-gray-200 relative shrink-0">
      {% if board.cover_image %}
        <img src="{{ board.cover_image.url }}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
      {% else %}
+       {# แก้ bg-linear เป็น bg-gradient เพื่อให้แสดงผลถูกต้อง #}
        <div class="w-full h-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
-          <span class="text-3xl opacity-20">🗂️</span> {# ลดขนาด icon นิดหน่อย #}
+          <span class="text-3xl opacity-20">🗂️</span>
        </div>
      {% endif %}
 
@@ -38,13 +38,11 @@
   </a>
 
   {# --- ส่วนเนื้อหาการ์ด --- #}
-  {# 🔻 แก้จาก p-4 เป็น p-3 (ลด Padding) #}
   <div class="p-3 flex-1 flex flex-col">
     <a href="{% url 'board_detail' board.id %}" class="block group-hover:text-indigo-600 transition-colors">
         <h3 class="font-bold text-gray-800 truncate text-sm mb-1">{{ board.name }}</h3>
     </a>
     
-    {# ตัดคำบรรยายให้สั้นลงอีกนิด #}
     <p class="text-[11px] text-gray-500 line-clamp-2 min-h-[2.2em] mb-2 leading-relaxed">
         {{ board.description|default:"-" }}
     </p>
@@ -73,6 +71,7 @@
                 x-transition
                 class="absolute right-0 bottom-full mb-1 w-28 bg-white rounded shadow-lg border border-gray-100 z-20 overflow-hidden"
             >
+                {# ปุ่มแก้ไข: ใช้ชื่อตัวแปรให้ตรงกับ JS (editName, editDescription, editActionUrl) #}
                 <button 
                     type="button"
                     class="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2"
@@ -86,7 +85,7 @@
                         openMenu = false;
                     "
                 >
-                     แก้ไข
+                      แก้ไข
                 </button>
                 
                 <button 
@@ -99,7 +98,7 @@
                         openMenu = false;
                     "
                 >
-                     ลบ
+                      ลบ
                 </button>
             </div>
         </div>

@@ -27,6 +27,8 @@ function projectPage() {
         openDelete: false,
         deleteUrl: '',
         menuBoardId: null,
+        
+        
     };
 }
 
@@ -286,7 +288,7 @@ window.boardDetailPage = function (config) {
                 formData.append('list_id', listId);
                 formData.append('order', orderedIds.join(','));
 
-                try {
+              try {
                     const res = await fetch(this.moveUrl, {
                         method: 'POST',
                         headers: { 'X-CSRFToken': csrftoken },
@@ -296,9 +298,13 @@ window.boardDetailPage = function (config) {
                     if (!res.ok) {
                         console.error('Task move failed');
                         window.location.reload();
+                    } else {
+                        // ✅ เพิ่มบรรทัดนี้: ถ้าย้ายสำเร็จ ให้รีโหลดหน้าเพื่อซิงค์ข้อมูลล่าสุดจาก Server
+                        window.location.reload(); 
                     }
                 } catch (err) {
                     console.error(err);
+                    alert("เกิดข้อผิดพลาดในการย้ายการ์ด"); // เพิ่ม Alert ให้รู้ถ้าเน็ตหลุด
                 }
                 
                 this.draggingTaskId = null;

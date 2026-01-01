@@ -234,7 +234,12 @@ def toggle_task_completion(request, task_id):
 # LIST CREATE
 @login_required
 def list_create(request, board_id):
-    board = get_object_or_404(Board, id=board_id, created_by=request.user)
+    board = get_object_or_404(
+        Board.objects.filter(
+            Q(created_by=request.user) | Q(members=request.user)
+        ).distinct(),
+        id=board_id
+    )
 
     if request.method == "POST":
         title = request.POST.get("title", "").strip()
@@ -253,7 +258,12 @@ def list_create(request, board_id):
 # LIST UPDATE
 @login_required
 def list_update(request, list_id):
-    lst = get_object_or_404(List, id=list_id, board__created_by=request.user)
+    lst = get_object_or_404(
+        List.objects.filter(
+            Q(board__created_by=request.user) | Q(board__members=request.user)
+        ).distinct(),
+        id=list_id
+    )
     board = lst.board
 
     if request.method == "POST":
@@ -269,7 +279,12 @@ def list_update(request, list_id):
 # LIST DELETE
 @login_required
 def list_delete(request, list_id):
-    list_obj = get_object_or_404(List, id=list_id, board__created_by=request.user)
+    list_obj = get_object_or_404(
+        List.objects.filter(
+            Q(board__created_by=request.user) | Q(board__members=request.user)
+        ).distinct(),
+        id=list_id
+    )
 
     if request.method == "POST":
         board_id = list_obj.board.id
@@ -322,7 +337,10 @@ def task_create(request, list_id):
 @require_POST
 @login_required
 def list_reorder(request, board_id):
-    board = get_object_or_404(Board, id=board_id, created_by=request.user)
+    board = get_object_or_404(
+        Board, 
+        Q(id=board_id) & (Q(created_by=request.user) | Q(members=request.user))
+    )
     list_id = request.POST.get("list_id")
     target_id = request.POST.get("target_id")
 
@@ -432,42 +450,47 @@ def task_move(request):
         
         # รับ list ของ ID ทั้งหมดในคอลัมน์นั้น (เรียงมาแล้วจาก JS)
         order_str = request.POST.get("order", "") 
+    
+        task = get_object_or_404(
+            Task.objects.filter(
+                Q(list__board__created_by=request.user) | Q(list__board__members=request.user)
+            ).distinct(),
+            id=task_id
+        )
         
-        # ⚠️ หมายเหตุ: ตรงนี้ถ้าอยากให้สมาชิกย้ายได้ด้วย ควรแก้ query เป็น Q(members...) | Q(created_by...) เหมือนอันก่อนหน้าครับ
-        task = get_object_or_404(Task, id=task_id) # แก้เบื้องต้นให้สั้นลง
+        # ตรวจสอบว่าลิสต์เป้าหมายอยู่ในบอร์ดเดียวกัน
         target_list = get_object_or_404(List, id=list_id, board=task.list.board)
 
         # 1. ย้าย Task ไปลิสต์ใหม่ (ถ้ามีการเปลี่ยนลิสต์)
         if task.list != target_list:
-            # ✅ 1. เก็บชื่อลิสต์เก่าไว้ก่อนที่จะเปลี่ยนค่า
-            old_list_title = task.list.title
+            old_list_title = task.list.title # เก็บชื่อเก่าไว้ทำ Log
 
             # เปลี่ยนลิสต์ใหม่
             task.list = target_list
             task.save()
 
-            # ✅ 2. บันทึก Log ทันทีหลังจาก Save
+            # บันทึก Log
             log_activity(
                 target_list.board, 
                 request.user, 
                 f"ย้ายการ์ด '{task.title}' จาก '{old_list_title}' ไปยัง '{target_list.title}'"
             )
 
-        # 2. อัปเดต position ของทุก Task ในลิสต์นั้น
+        # 2. อัปเดต position ของทุก Task ในลิสต์นั้น (Reorder)
         if order_str:
             ordered_ids = [int(id) for id in order_str.split(",") if id]
             
-            # ดึง tasks ทั้งหมดในลิสต์เป้าหมายมา
+            # ดึง tasks ทั้งหมดในลิสต์เป้าหมายมา (เพื่อลด Query ใน Loop)
             tasks_in_list = Task.objects.filter(list=target_list, id__in=ordered_ids)
             
-            # สร้าง dict เพื่อให้เข้าถึงง่าย {task_id: task_obj}
+            # สร้าง dict {task_id: task_object} เพื่อให้เข้าถึงข้อมูลเร็วๆ
             task_map = {t.id: t for t in tasks_in_list}
             
             # วนลูปเซฟ position ตามลำดับที่ส่งมา
             for index, t_id in enumerate(ordered_ids, start=1):
                 if t_id in task_map:
                     t = task_map[t_id]
-                    # เซฟเฉพาะถ้าค่าเปลี่ยน (ลด query)
+                    # เซฟเฉพาะถ้าค่าเปลี่ยนจริง ๆ (ช่วยลดการยิง Database)
                     if t.position != index:
                         t.position = index
                         t.save(update_fields=['position'])
@@ -476,6 +499,7 @@ def task_move(request):
         
     except Exception as e:
         return JsonResponse({"success": False, "error": str(e)}, status=500)
+
 @require_POST
 @login_required
 def toggle_task_archive(request, task_id):
