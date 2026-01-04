@@ -68,6 +68,8 @@ urlpatterns = [
     # 1. หน้าปฏิทิน
     path('my-calendar/', global_calendar_view, name='global_calendar'),
     path('api/calendar/events/', api_calendar_events, name='api_calendar_events'),
+    path('google-calendar/init/', google_calendar_init, name='google_calendar_init'),
+    path('google-calendar/callback/', google_calendar_callback, name='google_calendar_callback'),
 
     # 2. Reporting
     path('reporting/', reporting_view, name='reporting'),

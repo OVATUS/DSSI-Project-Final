@@ -11,10 +11,20 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+GOOGLE_OAUTH_CLIENT_SECRETS_FILE = os.path.join(BASE_DIR, 'client_secret.json')
+
+# สิทธิ์ที่เราจะขอจาก User (ขอแค่อ่านปฏิทินอย่างเดียวพอ เพื่อความปลอดภัย)
+GOOGLE_CALENDAR_SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
+
+# URL ที่ Google จะดีดกลับมาหลัง Login เสร็จ (ต้องตรงกับที่ตั้งใน Console เป๊ะๆ)
+# ถ้าขึ้น Production ต้องเปลี่ยนเป็น Domain จริง
+GOOGLE_REDIRECT_URI = 'http://127.0.0.1:8000/board/google-calendar/callback/'
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/

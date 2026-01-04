@@ -13,6 +13,11 @@ from django.utils import timezone
 from datetime import timedelta
 from django.db.models import Count
 from django.db.models.functions import TruncDate
+from google_auth_oauthlib.flow import Flow
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+from django.conf import settings
+import datetime
 
 
 
@@ -975,10 +980,43 @@ def get_board_activities(request, board_id):
     
     return JsonResponse({'activities': data})
 
-# ==============================#
-# ======= ปฏิทินบอร์ด ==========#
-# ==============================#
+# ==========================================
+# ======= Google Calendar Authentication ===
+# ==========================================
 
+
+@login_required
+def google_calendar_callback(request):
+    state = request.session.get('google_oauth_state')
+    
+    try:
+        flow = Flow.from_client_secrets_file(
+            settings.GOOGLE_OAUTH_CLIENT_SECRETS_FILE,
+            scopes=settings.GOOGLE_CALENDAR_SCOPES,
+            state=state,
+            redirect_uri=settings.GOOGLE_REDIRECT_URI
+        )
+        
+        # แปลง Code ที่ Google ส่งมา ให้กลายเป็น Token
+        flow.fetch_token(authorization_response=request.build_absolute_uri())
+        credentials = flow.credentials
+        
+        # เก็บ Token ลง Session (เพื่อให้ใช้งานต่อได้)
+        # หมายเหตุ: ใน Production จริงๆ ควรเก็บลง Database ผูกกับ User
+        request.session['google_credentials'] = {
+            'token': credentials.token,
+            'refresh_token': credentials.refresh_token,
+            'token_uri': credentials.token_uri,
+            'client_id': credentials.client_id,
+            'client_secret': credentials.client_secret,
+            'scopes': credentials.scopes
+        }
+        
+        return redirect('global_calendar') # เด้งกลับไปหน้าปฏิทิน
+        
+    except Exception as e:
+        print(f"Google Auth Error: {e}")
+        return redirect('global_calendar') # ถ้า error ก็กลับไปหน้าเดิม
 
 @login_required
 def global_calendar_view(request):
@@ -993,44 +1031,114 @@ def global_calendar_view(request):
 
 @login_required
 def api_calendar_events(request):
-    # รับค่า board_id จาก Dropdown (ถ้ามี)
+    # ส่วนที่ 1: ดึงงานจาก Board (Local Database)
     board_id = request.GET.get('board_id')
     
-    # Base Query: งานของฉัน หรือ งานในบอร์ดที่ฉันอยู่ ที่มีวันกำหนดส่ง
     tasks = Task.objects.filter(
         due_date__isnull=False,
         is_archived=False
     )
 
-    # Filter 1: กรองตามสิทธิ์ (เฉพาะบอร์ดที่ฉันเกี่ยวข้องเท่านั้น)
     user_boards = Board.objects.filter(Q(created_by=request.user) | Q(members=request.user))
     tasks = tasks.filter(list__board__in=user_boards)
 
-    # Filter 2: ถ้ามีการเลือกบอร์ดเจาะจง
     if board_id and board_id != 'all':
         tasks = tasks.filter(list__board_id=board_id)
 
     events = []
+    
     for task in tasks:
-        # กำหนดสี Event ตาม Priority
-        color = '#3B82F6' # Blue (Medium)
-        if task.priority == 'high':
-            color = '#EF4444' # Red
-        elif task.priority == 'low':
-            color = '#10B981' # Green
+        color = '#3B82F6' 
+        if task.priority == 'high': color = '#EF4444'
+        elif task.priority == 'low': color = '#10B981'
             
-        # ถ้าอยากให้สีต่างตามบอร์ด ก็สามารถใช้ task.list.board.id มาคำนวณสีได้
-
         events.append({
-            'title': f"[{task.list.board.name}] {task.title}", # ใส่ชื่อบอร์ดนำหน้า
+            'title': f"[{task.list.board.name}] {task.title}",
             'start': task.due_date.isoformat(),
-            'url': f"/board/{task.list.board.id}/?task_id={task.id}", # กดแล้ววิ่งไปหน้าบอร์ดนั้น
+            'url': f"/board/{task.list.board.id}/?task_id={task.id}",
             'backgroundColor': color,
             'borderColor': color,
+            'textColor': '#ffffff',
             'allDay': False
         })
-    
+
+    # ส่วนที่ 2: ดึงงานจาก Google Calendar (API)
+    if 'google_credentials' in request.session:
+        try:
+            creds_data = request.session['google_credentials']
+            creds = Credentials(**creds_data)
+            service = build('calendar', 'v3', credentials=creds)
+            
+            # กำหนดเวลาย้อนหลัง 1 ปี (เพื่อให้เห็นงานเก่าใน Classroom ด้วย)
+            start_time = (datetime.datetime.utcnow() - datetime.timedelta(days=365)).isoformat() + 'Z'
+            
+            # ดึงรายชื่อปฏิทินทั้งหมด
+            calendar_list_result = service.calendarList().list(showHidden=True).execute()
+            calendars = calendar_list_result.get('items', [])
+            
+            for calendar_entry in calendars:
+                cal_id = calendar_entry['id']
+                cal_summary = calendar_entry.get('summary', 'Unknown')
+                
+                # Filter: ข้ามปฏิทินที่ไม่จำเป็น
+                if 'holiday' in cal_id or 'addressbook' in cal_id or 'th.thai' in cal_id:
+                    continue
+
+                try:
+                    events_result = service.events().list(
+                        calendarId=cal_id,
+                        timeMin=start_time,  # ดึงย้อนหลัง 1 ปี
+                        maxResults=50,       # เพิ่มจำนวนต่อวิชาเผื่อมีงานเยอะ
+                        singleEvents=True,
+                        orderBy='startTime'
+                    ).execute()
+                    
+                    google_events = events_result.get('items', [])
+                    
+                    for event in google_events:
+                        # ดึงวันที่ (รองรับทั้งแบบระบุเวลา และแบบทั้งวัน)
+                        start = event['start'].get('dateTime', event['start'].get('date'))
+                        event_title = event.get('summary', 'No Title')
+                        is_all_day = 'date' in event['start']
+                        
+                        events.append({
+                            'title': f"[{cal_summary}] {event_title}", 
+                            'start': start,
+                            'url': event.get('htmlLink'),
+                            'backgroundColor': '#F59E0B',
+                            'borderColor': '#F59E0B',
+                            'textColor': '#ffffff',
+                            'allDay': is_all_day
+                        })
+                        
+                except Exception:
+                    continue
+                
+        except Exception:
+            # กรณี Session หมดอายุ หรือ Error อื่นๆ ให้ข้ามไปเงียบๆ
+            pass
+
     return JsonResponse(events, safe=False)
+
+@login_required
+def google_calendar_init(request):
+    # 1. สร้าง Flow สำหรับขอสิทธิ์
+    flow = Flow.from_client_secrets_file(
+        settings.GOOGLE_OAUTH_CLIENT_SECRETS_FILE,
+        scopes=settings.GOOGLE_CALENDAR_SCOPES,
+        redirect_uri=settings.GOOGLE_REDIRECT_URI
+    )
+    
+    # 2. สร้าง URL สำหรับ Login
+    authorization_url, state = flow.authorization_url(
+        access_type='offline',
+        include_granted_scopes='true'
+    )
+    
+    # 3. เก็บ state ไว้เช็คความปลอดภัยตอนขากลับ
+    request.session['google_oauth_state'] = state
+    
+    return redirect(authorization_url)
 
 # =============================#
 # ======= Reporting Views =======#
@@ -1107,3 +1215,4 @@ def reporting_view(request):
     }
 
     return render(request, 'boards/reporting.html', context)
+
