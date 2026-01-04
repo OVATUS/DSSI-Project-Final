@@ -18,7 +18,9 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from django.conf import settings
 import datetime
-
+import requests
+from django.core.mail import send_mail
+import threading
 
 
 @login_required
@@ -302,7 +304,7 @@ from django.db.models import Q  # อย่าลืม import Q ด้านบ
 
 @login_required
 def task_create(request, list_id):
-    # ✅ แก้ไขตรงนี้: เช็คว่าเป็น Owner (created_by) หรือ Member (members)
+    # ✅ เช็คสิทธิ์ (Owner หรือ Member)
     list_obj = get_object_or_404(
         List.objects.filter(
             Q(board__created_by=request.user) | Q(board__members=request.user)
@@ -314,21 +316,62 @@ def task_create(request, list_id):
         form = TaskForm(request.POST)
         if form.is_valid():
             task = form.save(commit=False)
+            task.created_by = request.user
             task.list = list_obj
             task.save()
+            
+            # บันทึก Activity Log
             log_activity(list_obj.board, request.user, f"สร้างการ์ด '{task.title}' ในรายการ '{list_obj.title}'")
+            
+            # จัดการ Labels
             label_ids = request.POST.getlist('labels')
             if label_ids:
                 task.labels.set(label_ids)
             
-            # Logic แจ้งเตือน (เหมือนเดิม)
+            # import threading ตรงนี้ครั้งเดียว เพื่อใช้ทั้ง Email และ Discord
+            import threading 
+
+            # ==================================================
+            # 📧 ส่วนแจ้งเตือนการมอบหมายงาน (Internal + Email)
+            # ==================================================
             if task.assigned_to and task.assigned_to != request.user:
+                # 1. แจ้งเตือนในระบบ (กระดิ่งบนเว็บ)
                 Notification.objects.create(
                     recipient=task.assigned_to,
                     actor=request.user,
                     task=task,
                     message=f"ได้มอบหมายงานใหม่ '{task.title}' ให้คุณ"
                 )
+
+                # 2. แจ้งเตือนผ่าน Email (ใช้ Thread เพื่อความลื่นไหล)
+                # (ต้องมีฟังก์ชัน send_email_notify ที่เราเขียนไว้ก่อนหน้านี้)
+                try:
+                    threading.Thread(
+                        target=send_email_notify, 
+                        args=(task, task.assigned_to)
+                    ).start()
+                except Exception as e:
+                    print(f"Email Thread Error: {e}")
+
+            # ==================================================
+            # 🎮 ส่วนแจ้งเตือน DISCORD (แจ้งทุกการสร้างงาน)
+            # ==================================================
+            try:
+                # ข้อความที่จะส่งเข้า Discord
+                discord_msg = (
+                    f"📝 **New Task Created!**\n"
+                    f"**Task:** {task.title}\n"
+                    f"**Board:** {list_obj.board.name}\n"
+                    f"**List:** {list_obj.title}\n"
+                    f"**By:** {request.user.username}"
+                )
+                
+                # ส่งเข้า Discord ผ่าน Thread
+                threading.Thread(target=send_discord_notify, args=(discord_msg,)).start()
+                
+            except Exception as e:
+                print(f"Discord Notify Error: {e}")
+            # ==================================================
 
             return redirect("board_detail", board_id=list_obj.board.id)
     else:
@@ -1216,3 +1259,50 @@ def reporting_view(request):
 
     return render(request, 'boards/reporting.html', context)
 
+# =========
+# DISCORD NOTIFICATION FUNCTION
+# =========
+def send_discord_notify(message):
+    webhook_url = getattr(settings, 'DISCORD_WEBHOOK_URL', None)
+    if not webhook_url:
+        return
+
+    try:
+        data = {
+            "username": "MyBoard System", # ชื่อที่จะขึ้นใน Discord
+            "avatar_url": "https://cdn-icons-png.flaticon.com/512/2991/2991148.png", # รูปไอคอน (เปลี่ยนได้)
+            "content": message
+        }
+        requests.post(webhook_url, json=data, timeout=3)
+    except Exception as e:
+        print(f"Discord Error: {e}") # ถ้าส่งไม่ผ่านก็ปล่อยไป ไม่ให้เว็บล่ม
+
+
+def send_email_notify(task, recipient):
+    """ฟังก์ชันส่งเมลแจ้งเตือนเมื่อได้รับมอบหมายงาน"""
+    if not recipient.email:
+        print(f"Email Warning: User {recipient.username} has no email address.")
+        return
+
+    subject = f"🔔 งานใหม่: {task.title}"
+    message = (
+        f"สวัสดีคุณ {recipient.username},\n\n"
+        f"คุณได้รับมอบหมายงานใหม่ในระบบ Board Management\n\n"
+        f"📌 ชื่องาน: {task.title}\n"
+        f"📅 กำหนดส่ง: {task.due_date if task.due_date else 'ไม่ระบุ'}\n"
+        f"📂 โปรเจกต์: {task.list.board.name}\n"
+        f"👤 มอบหมายโดย: {task.created_by.username}\n\n"
+        f"ตรวจสอบรายละเอียดได้ที่เว็บไซต์ของเรา"
+    )
+    
+    try:
+        send_mail(
+            subject,
+            message,
+            settings.DEFAULT_FROM_EMAIL,
+            [recipient.email],
+            fail_silently=False,
+        )
+        print(f"✅ Email sent to {recipient.email}")
+    except Exception as e:
+        print(f"❌ Email Error: {e}")
