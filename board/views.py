@@ -232,6 +232,7 @@ def toggle_task_completion(request, task_id):
         'completed_at': task.completed_at
     })
 
+
 # ------------------------------#
 # ------------------------------#
 #         LIST VIEWS
@@ -1306,3 +1307,19 @@ def send_email_notify(task, recipient):
         print(f"✅ Email sent to {recipient.email}")
     except Exception as e:
         print(f"❌ Email Error: {e}")
+
+@login_required
+@require_POST
+def leave_board(request, board_id):
+    board = get_object_or_404(Board, id=board_id)
+    
+    # ป้องกันเจ้าของบอร์ดกดออก (Backend Validation)
+    if request.user == board.created_by:
+        return redirect('board_detail', board_id=board.id)
+
+    if request.user in board.members.all():
+        board.members.remove(request.user)
+        # (Option) อยากบันทึก Log การออกด้วยไหม? ถ้าอยากก็ Uncomment บรรทัดล่างครับ
+        log_activity(board, request.user, f"ได้ออกจากบอร์ด '{board.name}'")
+        
+    return redirect('project_page') # ออกเสร็จเด้งกลับหน้าแรก

@@ -13,6 +13,7 @@
     taskIsArchived: false,
     taskId: null,
 
+    manageMembersOpen: false,
     activityDrawerOpen: false,
     activities: [],
     isLoadingActivities: false
@@ -28,6 +29,7 @@
         .board-scroll::-webkit-scrollbar-track { background: rgba(0,0,0,0.05); border-radius: 10px; }
         .board-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 10px; border: 3px solid transparent; background-clip: content-box; }
         .board-scroll::-webkit-scrollbar-thumb:hover { background-color: rgba(0,0,0,0.3); }
+
       </style>
 
       {# --- HEADER --- #}
@@ -40,16 +42,21 @@
         </div>
 
         <div class="flex items-center gap-2 sm:gap-3 ml-auto">
-            {# ... (ส่วนขวาของ Header เหมือนเดิม) ... #}
+    
+    {# --- 1. แสดงรูปโปรไฟล์สมาชิก 5 คนแรก --- #}
             <div class="hidden lg:flex items-center -space-x-2 mr-2 border-r border-gray-200 pr-4">
                 {% for member in board.members.all|slice:":5" %}
                 <div class="w-8 h-8 rounded-full border-2 border-white overflow-hidden bg-gray-200" title="{{ member.username }}">
-                    {% if member.profile_image %}<img src="{{ member.profile_image.url }}" class="w-full h-full object-cover">{% else %}<div class="w-full h-full bg-indigo-400 flex items-center justify-center text-white text-xs font-bold">{{ member.username.0|upper }}</div>{% endif %}
+                    {% if member.profile_image %}
+                        <img src="{{ member.profile_image.url }}" class="w-full h-full object-cover">
+                    {% else %}
+                        <div class="w-full h-full bg-indigo-400 flex items-center justify-center text-white text-xs font-bold">{{ member.username.0|upper }}</div>
+                    {% endif %}
                 </div>
                 {% endfor %}
-                <button @click="addMemberOpen = true" class="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 border-2 border-white flex items-center justify-center text-xs font-bold transition">+</button>
             </div>
 
+            {# --- 2. ช่องค้นหา & ตัวกรอง (เหมือนเดิม) --- #}
             <div class="flex items-center gap-2 bg-gray-50 p-1 rounded-full border border-gray-200">
                 <div class="relative group">
                     <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-gray-400 group-focus-within:text-indigo-500"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg></span>
@@ -65,27 +72,56 @@
                 <button x-show="filterMember || filterLabel" @click="filterMember = ''; filterLabel = ''" class="hidden sm:flex px-2 text-xs text-red-500 hover:text-red-700 font-bold" title="ล้างตัวกรอง">✕</button>
             </div>
 
+            {# --- 3. ปุ่มเมนู 3 จุด (Dropdown) --- #}
             <div class="relative">
-                <button @click="menuOpen = !menuOpen" class="flex items-center justify-center w-9 h-9 rounded-full bg-gray-100 hover:bg-indigo-50 text-gray-600 hover:text-indigo-600 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/50"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg></button>
+                <button @click="menuOpen = !menuOpen" class="flex items-center justify-center w-9 h-9 rounded-full bg-gray-100 hover:bg-indigo-50 text-gray-600 hover:text-indigo-600 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/50">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>
+                </button>
+
+                {# Dropdown Content #}
                 <div x-show="menuOpen" @click.away="menuOpen = false" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="transform opacity-0 scale-95" x-transition:enter-end="transform opacity-100 scale-100" x-transition:leave="transition ease-in duration-75" x-transition:leave-start="transform opacity-100 scale-100" x-transition:leave-end="transform opacity-0 scale-95" class="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50 origin-top-right divide-y divide-gray-100" style="display: none;">
+                    
                     <div class="py-1">
-                        <button @click="addMemberOpen = true; menuOpen = false" class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-3"><span class="flex items-center justify-center w-5 h-5 bg-indigo-100 text-indigo-600 rounded-full text-xs font-bold">+</span> เชิญสมาชิก</button>
-                        <div class="sm:hidden px-4 py-2"><div class="text-xs text-gray-400 mb-1">กรองสมาชิก:</div><select x-model="filterMember" class="w-full text-sm border-gray-200 rounded p-1 bg-gray-50"><option value="">ทั้งหมด</option>{% for member in board.members.all %}<option value="{{ member.id }}">{{ member.username }}</option>{% endfor %}</select></div>
+                        <button @click="addMemberOpen = true; menuOpen = false" class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-3">
+                            <span class="flex items-center justify-center w-5 h-5 bg-indigo-100 text-indigo-600 rounded-full text-xs font-bold">+</span> เชิญสมาชิก
+                        </button>
+                        
+                        {# ✅ เพิ่มปุ่มนี้ครับ: จัดการสมาชิก (ลบคนออก) #}
+                        <button @click="manageMembersOpen = true; menuOpen = false" class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                            จัดการสมาชิก
+                        </button>
+
+                        <div class="sm:hidden px-4 py-2">
+                            <div class="text-xs text-gray-400 mb-1">กรองสมาชิก:</div>
+                            <select x-model="filterMember" class="w-full text-sm border-gray-200 rounded p-1 bg-gray-50"><option value="">ทั้งหมด</option>{% for member in board.members.all %}<option value="{{ member.id }}">{{ member.username }}</option>{% endfor %}</select>
+                        </div>
                     </div>
+
                     <div class="py-1">
-                        <button @click="loadArchivedTasks({{ board.id }}); menuOpen = false" class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-3"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg> คลังที่เก็บ (Archived)</button>
-                        <button 
-                          @click="activityDrawerOpen = true; menuOpen = false; loadActivities({{ board.id }});"
-                          class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-3 transition-colors duration-150"
-                      >
-                          {# ไอคอนนาฬิกา (History) #}
-                          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 group-hover:text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          
-                          <span>ประวัติกิจกรรม</span>
-                      </button>
+                        <button @click="loadArchivedTasks({{ board.id }}); menuOpen = false" class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg> คลังที่เก็บ (Archived)
+                        </button>
+                        <button @click="activityDrawerOpen = true; menuOpen = false; loadActivities({{ board.id }});" class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            <span>ประวัติกิจกรรม</span>
+                        </button>
                     </div>
+
+                    {% if request.user != board.created_by %}
+                        <div class="border-t border-gray-100 mt-1 pt-1">
+                            <form action="{% url 'leave_board' board.id %}" method="POST" onsubmit="return confirm('คุณแน่ใจหรือไม่ที่จะออกจากบอร์ดนี้? \n(หากต้องการเข้าใหม่ ต้องให้สมาชิกเชิญเข้ามาอีกครั้ง)');">
+                                {% csrf_token %}
+                                <button type="submit" class="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-3">
+                                    {# ไอคอนประตูทางออก (Logout Icon) #}
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                    </svg>
+                                    ออกจากบอร์ด
+                                </button>
+                            </form>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -188,6 +224,76 @@
         </div>
     </div>
   </div>
+
+  {# --- Popup Manage Members (เพิ่มใหม่) --- #}
+<div x-show="manageMembersOpen" class="fixed inset-0 z-70 overflow-y-auto" style="display: none;">
+    <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity" aria-hidden="true" @click="manageMembersOpen = false">
+            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        
+        <div class="relative z-20 inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="mx-auto shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-indigo-100 sm:mx-0 sm:h-10 sm:w-10">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                    </div>
+                    <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">จัดการสมาชิกในบอร์ด</h3>
+                        <div class="mt-4">
+                            <ul class="divide-y divide-gray-200">
+                                {# 1. แสดงเจ้าของบอร์ด (ลบไม่ได้) #}
+                                <li class="py-3 flex items-center justify-between">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-8 h-8 rounded-full bg-indigo-500 text-white flex items-center justify-center font-bold text-xs">
+                                            {{ board.created_by.username.0|upper }}
+                                        </div>
+                                        <div>
+                                            <p class="text-sm font-medium text-gray-900">{{ board.created_by.username }}</p>
+                                            <p class="text-xs text-gray-500">เจ้าของบอร์ด (Owner)</p>
+                                        </div>
+                                    </div>
+                                </li>
+
+                                {# 2. แสดงสมาชิกคนอื่นๆ (ลบได้ถ้าเป็นเจ้าของ) #}
+                                {% for member in board.members.all %}
+                                <li class="py-3 flex items-center justify-between">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600 overflow-hidden">
+                                            {% if member.profile_image %}
+                                                <img src="{{ member.profile_image.url }}" class="w-full h-full object-cover">
+                                            {% else %}
+                                                {{ member.username.0|upper }}
+                                            {% endif %}
+                                        </div>
+                                        <p class="text-sm font-medium text-gray-900">{{ member.username }}</p>
+                                    </div>
+
+                                    {# ปุ่มลบ (แสดงเฉพาะเจ้าของบอร์ด) #}
+                                    {% if request.user == board.created_by %}
+                                    <form action="{% url 'remove_member' board.id member.id %}" method="POST" onsubmit="return confirm('ยืนยันลบ {{ member.username }} ออกจากบอร์ด?');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="text-red-500 hover:text-red-700 text-xs border border-red-200 hover:bg-red-50 px-3 py-1 rounded-full transition-colors">
+                                            ลบออก
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </li>
+                                {% empty %}
+                                <li class="py-4 text-center text-sm text-gray-500">ยังไม่มีสมาชิกอื่นในบอร์ดนี้</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button type="button" @click="manageMembersOpen = false" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">ปิดหน้าต่าง</button>
+            </div>
+        </div>
+    </div>
+</div>
 
   {# 3️⃣ พื้นที่อิสระ (Drawers & Modals) - วางไว้ตรงนี้จะไม่โดนตัดขอบ #}
   {% include "boards/components/popup_list_form.html" %}

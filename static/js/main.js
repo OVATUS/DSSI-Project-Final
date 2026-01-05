@@ -41,6 +41,7 @@ window.boardDetailPage = function (config) {
         // ==== Member & UI ====
         addMemberOpen: false,
         filterMember: '',
+        manageMembersOpen: false,
 
         // ==== Task Modal ====
         taskModalOpen: false,
