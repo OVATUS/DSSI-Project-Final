@@ -7,13 +7,19 @@ from users.models import User
 class BoardForm(forms.ModelForm):
     class Meta:
         model = Board
-        fields = ["name", "description", "cover_image"]
+        fields = ["name", "description", "cover_image", "discord_webhook_url"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        base = ("w-full rounded-md border border-gray-300 px-3 py-2 text-sm "
-                "focus:outline-none focus:ring-2 focus:ring-[#0094FF]")
+        
+        # Style พื้นฐานสำหรับ Input ทั่วไป
+        base_style = (
+            "w-full rounded-md border border-gray-300 px-3 py-2 text-sm "
+            "focus:outline-none focus:ring-2 focus:ring-[#0094FF]"
+        )
+
         for name, field in self.fields.items():
+            # 1. กรณีเป็นช่องอัปโหลดรูป (Cover Image)
             if name == "cover_image":
                 field.widget.attrs.update({
                     "class": (
@@ -23,8 +29,17 @@ class BoardForm(forms.ModelForm):
                         "hover:file:bg-[#0077cc]"
                     )
                 })
+
+            # ✅ 2. กรณีเป็นช่อง Discord (เพิ่ม Placeholder)
+            elif name == "discord_webhook_url":
+                field.widget.attrs.update({
+                    "class": base_style,
+                    "placeholder": "https://discord.com/api/webhooks/..." # ใส่ตัวอย่างลิงก์ให้ User เห็น
+                })
+
+            # 3. กรณีอื่นๆ (ใช้ Style พื้นฐาน)
             else:
-                field.widget.attrs.update({"class": base})
+                field.widget.attrs.update({"class": base_style})
 
 
 class ListForm(forms.ModelForm):

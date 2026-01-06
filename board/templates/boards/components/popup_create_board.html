@@ -9,13 +9,11 @@
     @click.outside="openCreate = false"
     class="bg-white rounded-xl shadow-xl border-[6px] border-[#0094FF] w-full max-w-md"
   >
-    <!-- หัวกล่อง -->
     <div class="bg-[#0094FF] text-white text-center py-2 rounded-t-lg">
       <h2 class="font-bold text-lg">สร้าง Project ใหม่</h2>
     </div>
 
     <div class="p-6 space-y-4">
-      <!-- Preview รูปปก -->
       <div class="w-full mb-2">
         <p class="text-xs text-gray-600 mb-1">ตัวอย่างรูปปก</p>
         <div
@@ -62,21 +60,29 @@
 
         <div>
           <label class="block text-sm font-semibold mb-1">ชื่อ Project</label>
-          {{ form.name }}
+          {{ form.name }} 
+          </div>
+
+        <div>
+          <label class="block text-sm font-semibold mb-1">Discord Webhook URL (Optional)</label>
+          {{ form.discord_webhook_url }}
+          <p class="text-xs text-gray-500 mt-1">
+            วางลิงก์ Webhook เพื่อรับแจ้งเตือนกิจกรรมในบอร์ดนี้ผ่าน Discord
+          </p>
         </div>
 
         <div class="flex justify-end gap-3 pt-2">
           <button
             type="button"
             @click="openCreate = false; coverPreview = null;"
-            class="px-4 py-1.5 rounded-full border border-gray-400 text-gray-700 text-sm"
+            class="px-4 py-1.5 rounded-full border border-gray-400 text-gray-700 text-sm hover:bg-gray-100 transition"
           >
             ยกเลิก
           </button>
 
           <button
             type="submit"
-            class="px-6 py-1.5 rounded-full bg-[#0094FF] text-white text-sm font-semibold"
+            class="px-6 py-1.5 rounded-full bg-[#0094FF] text-white text-sm font-semibold hover:bg-blue-600 transition shadow-md"
           >
             บันทึก
           </button>

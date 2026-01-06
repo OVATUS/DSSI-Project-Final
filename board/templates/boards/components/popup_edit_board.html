@@ -74,6 +74,20 @@
           ></textarea>
         </div>
 
+        <div>
+          <label class="block text-sm font-semibold mb-1">Discord Webhook URL</label>
+          <input
+            type="url"
+            name="discord_webhook_url"
+            x-model="editDiscordUrl" 
+            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0094FF]"
+            placeholder="https://discord.com/api/webhooks/..."
+          />
+          <p class="text-xs text-gray-500 mt-1">
+            แก้ไขลิงก์ Webhook เพื่อรับการแจ้งเตือน
+          </p>
+        </div>
+
         <div class="flex justify-end gap-3 pt-2">
           <button
             type="button"

@@ -25,6 +25,12 @@ class Board(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     starred_by = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='starred_boards', blank=True)
+    discord_webhook_url = models.URLField(
+        blank=True, 
+        null=True, 
+        verbose_name="Discord Webhook URL",
+        help_text="วางลิงก์ Webhook จาก Discord Channel ที่ต้องการให้แจ้งเตือน"
+    )
 
     def __str__(self):
         return self.name

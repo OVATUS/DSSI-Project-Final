@@ -222,9 +222,26 @@ def toggle_task_completion(request, task_id):
     if request.user not in task.list.board.members.all() and request.user != task.list.board.created_by:
         return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
 
-    # สลับสถานะ True <-> False
+    # สลับสถานะ
     task.is_completed = not task.is_completed
     task.save()
+
+    # -----------------------------------------------
+    # ✅ ส่วนแจ้งเตือน DISCORD (เพิ่มใหม่)
+    # -----------------------------------------------
+    webhook_url = task.list.board.discord_webhook_url
+    
+    # แจ้งเตือนเฉพาะตอนที่ติ๊ก "เสร็จ" (True) เท่านั้น (ตอนเอาออกไม่ต้องแจ้งก็ได้เดี๋ยวรก)
+    if webhook_url and task.is_completed:
+        import threading
+        msg = (
+            f"✅ **Task Completed!** 🎉\n"
+            f"**Task:** {task.title}\n"
+            f"**List:** {task.list.title}\n"
+            f"**Completed By:** {request.user.username}"
+        )
+        # ใช้ Thread เพื่อไม่ให้ User ต้องรอ Request Discord ตอบกลับ
+        threading.Thread(target=send_discord_notify, args=(msg, webhook_url)).start()
 
     return JsonResponse({
         'success': True, 
@@ -345,7 +362,6 @@ def task_create(request, list_id):
                 )
 
                 # 2. แจ้งเตือนผ่าน Email (ใช้ Thread เพื่อความลื่นไหล)
-                # (ต้องมีฟังก์ชัน send_email_notify ที่เราเขียนไว้ก่อนหน้านี้)
                 try:
                     threading.Thread(
                         target=send_email_notify, 
@@ -355,23 +371,30 @@ def task_create(request, list_id):
                     print(f"Email Thread Error: {e}")
 
             # ==================================================
-            # 🎮 ส่วนแจ้งเตือน DISCORD (แจ้งทุกการสร้างงาน)
+            # 🎮 ส่วนแจ้งเตือน DISCORD (เฉพาะบอร์ดที่ตั้งค่าไว้)
             # ==================================================
             try:
-                # ข้อความที่จะส่งเข้า Discord
-                discord_msg = (
-                    f"📝 **New Task Created!**\n"
-                    f"**Task:** {task.title}\n"
-                    f"**Board:** {list_obj.board.name}\n"
-                    f"**List:** {list_obj.title}\n"
-                    f"**By:** {request.user.username}"
-                )
+                # ดึง URL จากบอร์ดปัจจุบัน (ต้องแน่ใจว่า Model Board มี field นี้แล้ว)
+                webhook_url = list_obj.board.discord_webhook_url 
                 
-                # ส่งเข้า Discord ผ่าน Thread
-                threading.Thread(target=send_discord_notify, args=(discord_msg,)).start()
+                if webhook_url: # ✅ เช็คว่ามี URL ไหม ถ้ามีค่อยส่ง
+                    # ข้อความที่จะส่งเข้า Discord
+                    discord_msg = (
+                        f"📝 **New Task Created!**\n"
+                        f"**Task:** {task.title}\n"
+                        f"**Board:** {list_obj.board.name}\n"
+                        f"**List:** {list_obj.title}\n"
+                        f"**By:** {request.user.username}"
+                    )
+                    
+                    # ส่งเข้า Discord โดยส่ง URL ของบอร์ดนี้ไปด้วย
+                    threading.Thread(
+                        target=send_discord_notify, 
+                        args=(discord_msg, webhook_url)
+                    ).start()
                 
             except Exception as e:
-                print(f"Discord Notify Error: {e}")
+                print(f"Discord Notify Error: {e}") # ถ้า Error ก็แค่ print บอก แต่ไม่ให้เว็บพัง
             # ==================================================
 
             return redirect("board_detail", board_id=list_obj.board.id)
@@ -429,7 +452,7 @@ def list_reorder(request, board_id):
 
 @login_required
 def task_update(request, task_id):
-    # ✅ แก้ไข Query: เช็คว่าเป็น Owner (created_by) หรือ Member (members)
+    # (Query เดิม)
     task = get_object_or_404(
         Task.objects.filter(
             Q(list__board__created_by=request.user) | Q(list__board__members=request.user)
@@ -438,20 +461,21 @@ def task_update(request, task_id):
     )
 
     if request.method == "POST":
-        # จำคนรับผิดชอบคนเก่าไว้ก่อน save
-        old_assigned_to = task.assigned_to
+        old_assigned_to = task.assigned_to # จำคนเก่าไว้
 
         form = TaskForm(request.POST, instance=task)
         if form.is_valid():
-            updated_task = form.save() # บันทึกค่าใหม่
-
+            updated_task = form.save()
+            
+            # จัดการ Labels
             label_ids = request.POST.getlist('labels')
             updated_task.labels.set(label_ids)
 
-            # Logic แจ้งเตือนตอนแก้ไข
             new_assigned_to = updated_task.assigned_to
 
-            # เงื่อนไข: มีคนรับผิดชอบ + ไม่ใช่ตัวเอง + และต้องเป็นคนใหม่ (ไม่ซ้ำคนเดิม)
+            # -----------------------------------------------
+            # ส่วนแจ้งเตือน Internal Notification (Code เดิม)
+            # -----------------------------------------------
             if new_assigned_to and new_assigned_to != request.user:
                 if new_assigned_to != old_assigned_to:
                     Notification.objects.create(
@@ -460,6 +484,24 @@ def task_update(request, task_id):
                         task=updated_task,
                         message=f"ได้มอบหมายงาน '{updated_task.title}' ให้คุณ"
                     )
+
+            # -----------------------------------------------
+            # ✅ ส่วนแจ้งเตือน DISCORD (เพิ่มใหม่)
+            # -----------------------------------------------
+            import threading
+            webhook_url = task.list.board.discord_webhook_url
+
+            if webhook_url:
+                # กรณี 1: มีการเปลี่ยนคนรับผิดชอบ
+                if new_assigned_to != old_assigned_to:
+                    assignee_name = new_assigned_to.username if new_assigned_to else "Unassigned"
+                    msg = (
+                        f"🔄 **Task Updated**\n"
+                        f"**Task:** {updated_task.title}\n"
+                        f"**Assignee:** {assignee_name}\n"
+                        f"**By:** {request.user.username}"
+                    )
+                    threading.Thread(target=send_discord_notify, args=(msg, webhook_url)).start()
 
             return redirect("board_detail", board_id=task.list.board.id)
     else:
@@ -625,7 +667,27 @@ def delete_label(request, label_id):
 #-------------------------------#
 # ------------------------------#
 
-# board/views.py
+def send_invitation_email(invite, sender):
+    if not invite.recipient.email:
+        return
+
+    subject = f"📨 คำเชิญเข้าร่วมบอร์ด: {invite.board.name}"
+    message = (
+        f"สวัสดีคุณ {invite.recipient.username},\n\n"
+        f"คุณ {sender.username} ได้เชิญคุณเข้าร่วมโปรเจกต์ '{invite.board.name}'\n\n"
+        f"สามารถเข้าไปตอบรับคำเชิญได้ที่เว็บไซต์ของเรา"
+    )
+    
+    try:
+        send_mail(
+            subject,
+            message,
+            settings.DEFAULT_FROM_EMAIL,
+            [invite.recipient.email],
+            fail_silently=False,
+        )
+    except Exception as e:
+        print(f"Invite Email Error: {e}")
 
 @require_POST
 @login_required
@@ -1263,11 +1325,9 @@ def reporting_view(request):
 # =========
 # DISCORD NOTIFICATION FUNCTION
 # =========
-def send_discord_notify(message):
-    webhook_url = getattr(settings, 'DISCORD_WEBHOOK_URL', None)
+def send_discord_notify(message, webhook_url=None):
     if not webhook_url:
         return
-
     try:
         data = {
             "username": "MyBoard System", # ชื่อที่จะขึ้นใน Discord

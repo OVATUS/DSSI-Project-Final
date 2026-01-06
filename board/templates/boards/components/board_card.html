@@ -11,7 +11,7 @@
        <img src="{{ board.cover_image.url }}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
      {% else %}
        {# แก้ bg-linear เป็น bg-gradient เพื่อให้แสดงผลถูกต้อง #}
-       <div class="w-full h-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
+       <div class="w-full h-full bg-linear-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
           <span class="text-3xl opacity-20">🗂️</span>
        </div>
      {% endif %}
@@ -83,6 +83,7 @@
                         editDescription = '{{ board.description|default_if_none:""|escapejs }}';
                         editCoverPreview = '{% if board.cover_image %}{{ board.cover_image.url }}{% endif %}';
                         openMenu = false;
+                        editDiscordUrl = '{{ board.discord_webhook_url|default:""|escapejs }}';
                     "
                 >
                       แก้ไข
