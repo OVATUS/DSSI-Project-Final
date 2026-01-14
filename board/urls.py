@@ -71,7 +71,11 @@ urlpatterns = [
     path('api/calendar/events/', api_calendar_events, name='api_calendar_events'),
     path('google-calendar/init/', google_calendar_init, name='google_calendar_init'),
     path('google-calendar/callback/', google_calendar_callback, name='google_calendar_callback'),
+    path('api/calendar-widget/', fetch_google_calendar_partial, name='fetch_google_calendar'),
 
     # 2. Reporting
     path('reporting/', reporting_view, name='reporting'),
+
+    path('schedule/create/', create_class_schedule, name='create_class_schedule'),
+    path('schedule/delete/<int:schedule_id>/', delete_class_schedule, name='delete_class_schedule'),
 ]

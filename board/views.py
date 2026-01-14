@@ -1,8 +1,8 @@
 from django.db import models
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
-from .models import Board, List, Task, Comment , Label , BoardInvitation , ChecklistItem, Attachment, Notification , ActivityLog
-from .forms import BoardForm, ListForm, TaskForm  
+from .models import Board, List, Task, Comment , Label , BoardInvitation , ChecklistItem, Attachment, Notification , ActivityLog , ClassSchedule
+from .forms import BoardForm, ListForm, TaskForm , ClassScheduleForm 
 from users.models import User
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
@@ -21,70 +21,7 @@ import datetime
 import requests
 from django.core.mail import send_mail
 import threading
-
-
-@login_required
-def board_lsit_view(request):
-    # --- 1. ส่วนคำเชิญ (Invitations) ---
-    received_invites = BoardInvitation.objects.filter(
-        recipient=request.user, 
-        status='pending'
-    ).select_related('sender', 'board')
-
-    # --- 2. ส่วนบอร์ด (Boards) ---
-    boards = Board.objects.filter(
-        Q(created_by=request.user) | Q(members=request.user)
-    ).distinct()
-
-    # --- 3. ส่วนงานของฉัน (My Tasks) ---
-    # ✅ แก้ไขตรงนี้: เปลี่ยนจาก exclude(status='done') เป็น filter(is_completed=False)
-    all_tasks = Task.objects.filter(
-        assigned_to=request.user,
-        is_completed=False,  # เอาเฉพาะงานที่ "ยังไม่เสร็จ" (ยังไม่ติ๊กถูก)
-        is_archived=False    # เอาเฉพาะงานที่ "ยังไม่ถูกเก็บเข้าคลัง"
-    ).select_related('list__board').order_by('due_date', '-priority')
-
-    now = timezone.now()
-    next_week = now + timedelta(days=7)
-    
-    # เตรียมข้อมูลสำหรับส่งไปหน้าเว็บ
-    task_list_data = []
-    
-    # ตัวนับจำนวนงาน (Counters)
-    counts = {
-        'all': all_tasks.count(),
-        'overdue': 0,
-        'week': 0
-    }
-
-    for task in all_tasks:
-        is_overdue = False
-        is_week = False
-
-        if task.due_date:
-            # เช็คว่าเลยกำหนดไหม
-            if task.due_date < now:
-                is_overdue = True
-                counts['overdue'] += 1
-            # เช็คว่าอยู่ในสัปดาห์นี้ไหม
-            elif task.due_date <= next_week:
-                is_week = True
-                counts['week'] += 1
-        
-        task_list_data.append({
-            'obj': task,
-            'is_overdue': is_overdue,
-            'is_week': is_week
-        })
-
-    context = {
-        'received_invites': received_invites,
-        'boards': boards,
-        'task_list_data': task_list_data,
-        'counts': counts,
-    }
-    
-    return render(request, 'boards/dashboard.html', context)
+from django.core.cache import cache
 
 @login_required
 @require_POST
@@ -1246,6 +1183,92 @@ def google_calendar_init(request):
     
     return redirect(authorization_url)
 
+@login_required
+def fetch_google_calendar_partial(request):
+    """
+    ดึงข้อมูลจาก Google Calendar แบบ Asynchronous
+    คืนค่าเป็น HTML ก้อนเล็กๆ (Partial) เพื่อนำไปแปะในหน้า Dashboard
+    """
+    google_events = []
+    
+    # เช็คว่ามี Credentials ไหม
+    if 'google_credentials' in request.session:
+        try:
+            creds_data = request.session['google_credentials']
+            creds = Credentials(**creds_data)
+            service = build('calendar', 'v3', credentials=creds)
+            
+            now_iso = datetime.datetime.utcnow().isoformat() + 'Z'
+            
+            # 1. ดึงรายชื่อปฏิทิน
+            calendar_list = service.calendarList().list().execute().get('items', [])
+            
+            all_events = []
+            
+            # 2. วนลูปดึง Event (ส่วนนี้แหละที่ช้า เราเลยย้ายมาทำทีหลัง)
+            for calendar_entry in calendar_list:
+                cal_name = calendar_entry.get('summary', '')
+
+                # กรองปฏิทินที่ไม่ต้องการ
+                keywords = ['holiday', 'วันหยุด', 'birthday', 'วันเกิด']
+                if any(k in cal_name.lower() for k in keywords):
+                    continue
+
+                try:
+                    # ดึง Event จากแต่ละปฏิทิน
+                    events_result = service.events().list(
+                        calendarId=calendar_entry['id'], 
+                        timeMin=now_iso,
+                        maxResults=5, 
+                        singleEvents=True,
+                        orderBy='startTime'
+                    ).execute()
+                    
+                    items = events_result.get('items', [])
+                    for event in items:
+                        event['calendar_name'] = cal_name
+                        all_events.append(event)
+                        
+                except Exception as e:
+                    # ถ้าปฏิทินไหน error ก็ข้ามไป ไม่ให้เว็บพัง
+                    continue
+
+            # 3. จัดเรียงตามเวลา
+            def get_start_time(e):
+                return e['start'].get('dateTime', e['start'].get('date'))
+            
+            all_events.sort(key=get_start_time)
+            all_events = all_events[:15] # เอาแค่ 15 อันดับแรก
+
+            # 4. จัด Format ข้อมูล
+            for event in all_events:
+                start = event['start'].get('dateTime', event['start'].get('date'))
+                try:
+                    if isinstance(start, str):
+                        if 'T' in start:
+                             start_dt = datetime.datetime.fromisoformat(start.replace('Z', '+00:00'))
+                        else:
+                             start_dt = datetime.datetime.strptime(start, "%Y-%m-%d")
+                    else:
+                        start_dt = start
+                except ValueError:
+                    start_dt = start
+
+                google_events.append({
+                    'title': event.get('summary', '(ไม่มีชื่อ)'),
+                    'start': start_dt,
+                    'link': event.get('htmlLink', '#'),
+                    'source': event.get('calendar_name', 'Google Calendar')
+                })
+                
+        except Exception as e:
+            print(f"Google API Error in Partial View: {e}")
+
+    # ส่งไปที่ Template ย่อย (เฉพาะส่วน Widget)
+    return render(request, 'boards/partials/calendar_widget.html', {
+        'google_events': google_events
+    })
+
 # =============================#
 # ======= Reporting Views =======#
 # =============================#
@@ -1383,3 +1406,224 @@ def leave_board(request, board_id):
         log_activity(board, request.user, f"ได้ออกจากบอร์ด '{board.name}'")
         
     return redirect('project_page') # ออกเสร็จเด้งกลับหน้าแรก
+
+
+@login_required
+def board_lsit_view(request):
+    manual_schedules = ClassSchedule.objects.filter(user=request.user)
+    
+    # =================================================
+    # 1. ส่วนคำเชิญ (Invitations)
+    # =================================================
+    received_invites = BoardInvitation.objects.filter(
+        recipient=request.user, 
+        status='pending'
+    ).select_related('sender', 'board')
+
+    # =================================================
+    # 2. ส่วนบอร์ด (Boards)
+    # =================================================
+    boards = Board.objects.filter(
+        Q(created_by=request.user) | Q(members=request.user)
+    ).distinct()
+
+    # =================================================
+    # 3. ส่วนงานของฉัน (My Tasks)
+    # =================================================
+    all_tasks = Task.objects.filter(
+        assigned_to=request.user,
+        is_completed=False,
+        is_archived=False
+    ).select_related('list__board').order_by('due_date', '-priority')
+
+    now = timezone.now()
+    next_week = now + timedelta(days=7)
+    
+    task_list_data = []
+    counts = {'all': all_tasks.count(), 'overdue': 0, 'week': 0}
+
+    for task in all_tasks:
+        is_overdue = False
+        is_week = False
+        if task.due_date:
+            if task.due_date < now:
+                is_overdue = True
+                counts['overdue'] += 1
+            elif task.due_date <= next_week:
+                is_week = True
+                counts['week'] += 1
+        
+        task_list_data.append({
+            'obj': task,
+            'is_overdue': is_overdue,
+            'is_week': is_week
+        })
+
+    # =================================================
+    # 4. ส่วน Google Calendar (แบบมี Caching 🚀) - UPDATED
+    # =================================================
+    google_events = []
+    google_course_names = []
+    
+    if 'google_credentials' in request.session:
+        # ตั้งชื่อ Key สำหรับจำข้อมูล (แยกตาม User ID)
+        cache_key_events = f"google_events_{request.user.id}"
+        cache_key_courses = f"google_courses_{request.user.id}"
+        
+        # 1. ลองถาม Cache ดูก่อนว่ามีข้อมูลไหม?
+        cached_events = cache.get(cache_key_events)
+        cached_courses = cache.get(cache_key_courses)
+
+        if cached_events is not None and cached_courses is not None:
+            # ✅ เจอ! ใช้ข้อมูลเก่าเลย (เร็วมาก ไม่ต้องรอโหลด)
+            google_events = cached_events
+            google_course_names = cached_courses
+        else:
+            # ❌ ไม่เจอ (หรือหมดอายุ) ให้วิ่งไปถาม Google (ยอมช้าหน่อย)
+            try:
+                creds_data = request.session['google_credentials']
+                creds = Credentials(**creds_data)
+                service = build('calendar', 'v3', credentials=creds)
+                
+                now_iso = datetime.datetime.utcnow().isoformat() + 'Z'
+                
+                # 1. ดึงรายชื่อปฏิทิน
+                calendar_list = service.calendarList().list().execute().get('items', [])
+                
+                all_events = []
+                temp_course_names = [] # ใช้ตัวแปรชั่วคราว
+                
+                # 2. วนลูปดึง Event
+                for calendar_entry in calendar_list:
+                    cal_name = calendar_entry.get('summary', '')
+
+                    keywords = ['holiday', 'วันหยุด', 'birthday', 'วันเกิด']
+                    if any(k in cal_name.lower() for k in keywords):
+                        continue
+
+                    if cal_name not in temp_course_names and '@' not in cal_name:
+                        temp_course_names.append(cal_name)
+
+                    try:
+                        events_result = service.events().list(
+                            calendarId=calendar_entry['id'], 
+                            timeMin=now_iso,
+                            maxResults=5, 
+                            singleEvents=True,
+                            orderBy='startTime'
+                        ).execute()
+                        
+                        items = events_result.get('items', [])
+                        for event in items:
+                            event['calendar_name'] = cal_name
+                            all_events.append(event)
+                            
+                    except Exception:
+                        continue # ข้ามปฏิทินที่มีปัญหา
+
+                # 3. จัดเรียงข้อมูล
+                def get_start_time(e):
+                    return e['start'].get('dateTime', e['start'].get('date'))
+                
+                all_events.sort(key=get_start_time)
+                all_events = all_events[:15]
+
+                # 4. แปลงข้อมูล
+                final_events = []
+                for event in all_events:
+                    start = event['start'].get('dateTime', event['start'].get('date'))
+                    try:
+                        if isinstance(start, str):
+                            if 'T' in start:
+                                 start_dt = datetime.datetime.fromisoformat(start.replace('Z', '+00:00'))
+                            else:
+                                 start_dt = datetime.datetime.strptime(start, "%Y-%m-%d")
+                        else:
+                            start_dt = start
+                    except ValueError:
+                        start_dt = start
+
+                    final_events.append({
+                        'title': event.get('summary', '(ไม่มีชื่อ)'),
+                        'start': start_dt,
+                        'link': event.get('htmlLink', '#'),
+                        'source': event.get('calendar_name', 'Google Calendar')
+                    })
+                
+                # อัปเดตตัวแปรหลัก
+                google_events = final_events
+                google_course_names = temp_course_names
+
+                # 5. บันทึกลง Cache (จำไว้ 15 นาที = 900 วินาที) 💾
+                cache.set(cache_key_events, google_events, 900)
+                cache.set(cache_key_courses, google_course_names, 900)
+                
+            except Exception as e:
+                print(f"Google API Error: {e}")
+
+    # =================================================
+    # 5. ส่วนตารางเรียน (Schedule Calculation Logic) ✅
+    # =================================================
+    raw_schedules = ClassSchedule.objects.filter(user=request.user)
+    my_schedules = []
+    
+    START_BASE_MIN = 510  # 8:30
+    TOTAL_RANGE_MIN = 540 # 9 Hours
+
+    for sched in raw_schedules:
+        # คำนวณ Left
+        start_h = sched.start_time.hour
+        start_m = sched.start_time.minute
+        start_total_min = (start_h * 60) + start_m
+        left_percent = ((start_total_min - START_BASE_MIN) / TOTAL_RANGE_MIN) * 100
+        sched.style_left = max(0, min(100, left_percent))
+
+        # คำนวณ Width
+        end_h = sched.end_time.hour
+        end_m = sched.end_time.minute
+        end_total_min = (end_h * 60) + end_m
+        duration = end_total_min - start_total_min
+        width_percent = (duration / TOTAL_RANGE_MIN) * 100
+        sched.style_width = max(0, width_percent)
+        
+        my_schedules.append(sched)
+
+    days_list = [
+        ('Mon', 'จ.'), ('Tue', 'อ.'), ('Wed', 'พ.'), 
+        ('Thu', 'พฤ.'), ('Fri', 'ศ.'), ('Sat', 'ส.'), ('Sun', 'อา.')
+    ]
+
+    # =================================================
+    # 6. รวมข้อมูลส่งไปหน้าเว็บ
+    # =================================================
+    context = {
+        'received_invites': received_invites,
+        'boards': boards,
+        'task_list_data': task_list_data,
+        'counts': counts,
+        'google_events': google_events,
+        'google_course_names': google_course_names, 
+        'manual_schedules': manual_schedules, 
+        'schedule_form': ClassScheduleForm(),
+        'my_schedules': my_schedules, 
+        'days_list': days_list        
+    }
+    
+    return render(request, 'boards/dashboard.html', context)
+
+@login_required
+def create_class_schedule(request):
+    if request.method == 'POST':
+        form = ClassScheduleForm(request.POST)
+        if form.is_valid():
+            schedule = form.save(commit=False)
+            schedule.user = request.user
+            schedule.save()
+    return redirect('home') # หรือชื่อ URL หน้า dashboard ของคุณ
+
+# ✅ เพิ่ม View สำหรับลบ
+@login_required
+def delete_class_schedule(request, schedule_id):
+    schedule = get_object_or_404(ClassSchedule, id=schedule_id, user=request.user)
+    schedule.delete()
+    return redirect('home')

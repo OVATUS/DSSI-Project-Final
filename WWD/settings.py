@@ -25,7 +25,10 @@ os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 GOOGLE_OAUTH_CLIENT_SECRETS_FILE = os.path.join(BASE_DIR, 'client_secret.json')
 
 # สิทธิ์ที่เราจะขอจาก User (ขอแค่อ่านปฏิทินอย่างเดียวพอ เพื่อความปลอดภัย)
-GOOGLE_CALENDAR_SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
+GOOGLE_CALENDAR_SCOPES = [
+    'https://www.googleapis.com/auth/calendar.readonly', # สิทธิ์นี้อ่านได้ "ทุกปฏิทิน" รวมทั้ง Classroom
+    'https://www.googleapis.com/auth/calendar.events.readonly' # อ่าน Events ได้
+]
 
 # URL ที่ Google จะดีดกลับมาหลัง Login เสร็จ (ต้องตรงกับที่ตั้งใน Console เป๊ะๆ)
 # ถ้าขึ้น Production ต้องเปลี่ยนเป็น Domain จริง

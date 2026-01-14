@@ -1,0 +1,25 @@
+{% if google_events %}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {% for event in google_events %}
+        <div class="p-4 rounded-lg border border-gray-100 hover:border-blue-300 bg-white shadow-sm transition group flex flex-col justify-between h-full">
+            <div>
+                <div class="text-xs text-blue-600 font-semibold mb-1 flex items-center gap-1">
+                    📅 {{ event.start|date:"d M Y, H:i" }}
+                </div>
+                <div class="font-bold text-gray-800 text-sm mb-2 group-hover:text-blue-600 leading-tight">
+                    {{ event.title }}
+                </div>
+            </div>
+            <div class="flex flex-wrap gap-1 mt-2">
+                <span class="text-[10px] px-2 py-0.5 rounded-full font-bold truncate max-w-full border bg-blue-50 text-blue-600 border-blue-100">
+                    {{ event.source }}
+                </span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="text-center py-10 text-gray-400 text-sm">
+        <p>ไม่พบรายการจาก Google Calendar</p>
+    </div>
+{% endif %}

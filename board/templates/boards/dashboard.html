@@ -1,174 +1,378 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 font-sans">
 
-    {# ================================================= #}
-    {# 1. สรุปงานของฉัน (Task Summary) + ตัวกรอง        #}
-    {#    (ย้ายขึ้นมาเป็นส่วนแรก)                         #}
-    {# ================================================= #}
-    <div x-data="{ filter: 'all' }">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-            <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2">
-                 งานของฉัน (My Tasks)
-            </h2>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        {# ======================================================= #}
+        {# [LEFT COLUMN] (2/3): งานของฉัน + Google Tasks (ย้ายมา) #}
+        {# ======================================================= #}
+        <div class="lg:col-span-2 space-y-8">
             
-            {# ปุ่มตัวกรอง (Filter Tabs) #}
-            <div class="bg-gray-100 p-1 rounded-lg inline-flex self-start sm:self-auto">
-                <button 
-                    @click="filter = 'all'" 
-                    :class="filter === 'all' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
-                    class="px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2"
-                >
-                    ทั้งหมด <span class="bg-gray-200 text-gray-600 px-1.5 rounded-full text-[10px]">{{ counts.all }}</span>
-                </button>
+            {# 1. งานของฉัน (My Tasks - ระบบเดิม) #}
+            <div x-data="{ filter: 'all' }">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                    <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+                         📝 งานของฉัน (My Tasks)
+                    </h2>
+                    
+                    {# ปุ่มตัวกรอง #}
+                    <div class="bg-gray-100 p-1 rounded-lg inline-flex self-start sm:self-auto">
+                        <button @click="filter = 'all'" :class="filter === 'all' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'" class="px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2">
+                            ทั้งหมด <span class="bg-gray-200 text-gray-600 px-1.5 rounded-full text-[10px]">{{ counts.all }}</span>
+                        </button>
+                        <button @click="filter = 'week'" :class="filter === 'week' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'" class="px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2">
+                            Week นี้ <span class="bg-orange-100 text-orange-600 px-1.5 rounded-full text-[10px]">{{ counts.week }}</span>
+                        </button>
+                        <button @click="filter = 'overdue'" :class="filter === 'overdue' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'" class="px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2">
+                            เลยกำหนด <span class="bg-red-100 text-red-600 px-1.5 rounded-full text-[10px]">{{ counts.overdue }}</span>
+                        </button>
+                    </div>
+                </div>
 
-                <button 
-                    @click="filter = 'week'" 
-                    :class="filter === 'week' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
-                    class="px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2"
-                >
-                    Week นี้ <span class="bg-orange-100 text-orange-600 px-1.5 rounded-full text-[10px]">{{ counts.week }}</span>
-                </button>
-
-                <button 
-                    @click="filter = 'overdue'" 
-                    :class="filter === 'overdue' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
-                    class="px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2"
-                >
-                    เลยกำหนด <span class="bg-red-100 text-red-600 px-1.5 rounded-full text-[10px]">{{ counts.overdue }}</span>
-                </button>
+                <div class="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-200">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ชื่องาน</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">โปรเจกต์</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">สถานะ</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">กำหนดส่ง</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                {% for item in task_list_data %}
+                                <tr 
+                                    x-show="(filter === 'all') || (filter === 'overdue' && {{ item.is_overdue|yesno:'true,false' }}) || (filter === 'week' && {{ item.is_week|yesno:'true,false' }})"
+                                    class="hover:bg-gray-50 transition-colors cursor-pointer" 
+                                    onclick="window.location.href='{% url 'board_detail' item.obj.list.board.id %}'"
+                                >
+                                    <td class="px-6 py-4">
+                                        <div class="text-sm font-bold text-gray-800">{{ item.obj.title }}</div>
+                                        {% if item.obj.priority == 'high' %}
+                                            <span class="text-[10px] text-red-600 font-bold bg-red-50 px-1 rounded">High</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-6 py-4 text-xs text-gray-500">{{ item.obj.list.board.name }}</td>
+                                    <td class="px-6 py-4"><span class="px-2 py-0.5 text-xs bg-gray-100 rounded-full">{{ item.obj.get_status_display }}</span></td>
+                                    <td class="px-6 py-4 text-sm">{{ item.obj.due_date|date:"d M"|default:"-" }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="px-6 py-8 text-center text-gray-400">ไม่มีงานค้างในขณะนี้</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
+
+            {# 2. Google Tasks Widget (ย้ายมาฝั่งซ้าย + ขยายกว้าง) #}
+            <div class="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden flex flex-col" x-data="{ courseFilter: 'all' }">
+                <div class="p-4 bg-gray-50 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <h3 class="font-bold text-gray-700 flex items-center gap-2">
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/a/a5/Google_Calendar_icon_%282020%29.svg" class="w-6 h-6">
+                        Google Tasks / Events
+                    </h3>
+                    
+                    {# ตัวเลือกกรองวิชา #}
+                    <div class="w-full sm:w-64">
+                        <select x-model="courseFilter" class="w-full text-xs border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="all">ทั้งหมด (All Courses)</option>
+                            {% regroup google_events by source as course_list %}
+                            {% for course in course_list %}
+                                {% if course.grouper %}
+                                    <option value="{{ course.grouper }}">{{ course.grouper }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="p-6">
+                    {% if google_events %}
+                        {# แสดงเป็น Grid 2 คอลัมน์เพื่อให้ดูสวยบนพื้นที่กว้าง #}
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {% for event in google_events %}
+                            <div 
+                                x-show="courseFilter === 'all' || courseFilter === '{{ event.source|escapejs }}'"
+                                class="p-4 rounded-lg border border-gray-100 hover:border-blue-300 bg-white shadow-sm transition group flex flex-col justify-between h-full"
+                            >
+                                <div>
+                                    <div class="text-xs text-blue-600 font-semibold mb-1 flex items-center gap-1">
+                                        📅 {{ event.start|date:"d M Y, H:i" }}
+                                    </div>
+                                    <div class="font-bold text-gray-800 text-sm mb-2 group-hover:text-blue-600 leading-tight">
+                                        {{ event.title }}
+                                    </div>
+                                </div>
+                                
+                                <div class="flex flex-wrap gap-1 mt-2">
+                                    {% if event.source %}
+                                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold truncate max-w-full border
+                                        {% if event.source != 'Google Calendar' and '@' not in event.source %}
+                                            bg-green-50 text-green-700 border-green-100
+                                        {% else %}
+                                            bg-blue-50 text-blue-600 border-blue-100
+                                        {% endif %}
+                                    ">
+                                        {{ event.source }}
+                                    </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-10 text-gray-400 text-sm bg-gray-50 rounded-lg border-dashed border-2 border-gray-200">
+                            <svg class="w-12 h-12 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                            <p>ไม่มีรายการจาก Google Calendar</p>
+                            <a href="{% url 'google_calendar_init' %}" class="text-blue-500 hover:underline mt-2 block font-medium">เชื่อมต่อบัญชี Google</a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
         </div>
 
-        {# ตารางงาน #}
-        <div class="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-200">
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ชื่องาน</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">โปรเจกต์</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">สถานะ</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">กำหนดส่ง</th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        {% for item in task_list_data %}
-                        {# ใช้ x-show กรองแถวตามสถานะ #}
-                        <tr 
-                            x-show="(filter === 'all') || (filter === 'overdue' && {{ item.is_overdue|yesno:'true,false' }}) || (filter === 'week' && {{ item.is_week|yesno:'true,false' }})"
-                            class="hover:bg-gray-50 transition-colors cursor-pointer" 
-                            onclick="window.location.href='{% url 'board_detail' item.obj.list.board.id %}'"
-                        >
-                            <td class="px-6 py-4">
-                                <div class="text-sm font-bold text-gray-800">{{ item.obj.title }}</div>
-                                {% if item.obj.priority == 'high' %}
-                                    <span class="text-[10px] text-red-600 font-bold bg-red-50 px-1 rounded">High Priority</span>
-                                {% endif %}
-                            </td>
-                            <td class="px-6 py-4">
-                                <div class="text-xs text-gray-500">
-                                     {{ item.obj.list.board.name }}
-                                    <span class="mx-1">/</span>
-                                    {{ item.obj.list.title }}
+        {# ======================================================= #}
+        {# [RIGHT COLUMN] (1/3): คำเชิญ (ย้ายมา) + แสดงตลอดเวลา     #}
+        {# ======================================================= #}
+        <div class="lg:col-span-1">
+            
+            {# 3. คำเชิญ (Invitations Box) #}
+            <div class="bg-white rounded-xl shadow-md border-l-4 border-indigo-500 overflow-hidden sticky top-8 mb-8">
+                <div class="p-4 bg-indigo-50 border-b border-indigo-100 flex justify-between items-center">
+                    <h3 class="text-indigo-900 font-bold flex items-center gap-2 text-base">
+                        📩 คำเชิญเข้าร่วม
+                        {% if received_invites %}
+                            <span class="bg-indigo-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">{{ received_invites.count }}</span>
+                        {% endif %}
+                    </h3>
+                </div>
+                
+                <div class="divide-y divide-gray-100">
+                    {% for invite in received_invites %}
+                    <div class="p-4 flex flex-col gap-3 hover:bg-gray-50 transition-colors">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm shrink-0">
+                                {{ invite.sender.username.0|upper }}
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-gray-800 text-xs"><span class="font-bold">{{ invite.sender.username }}</span> เชิญคุณเข้าร่วม</p>
+                                <p class="text-indigo-600 font-bold text-sm leading-tight truncate">"{{ invite.board.name }}"</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <a href="{% url 'respond_invitation' invite.id 'accept' %}" class="flex-1 text-center bg-indigo-600 text-white px-3 py-1.5 rounded text-xs hover:bg-indigo-700 transition">ตอบรับ</a>
+                            <a href="{% url 'respond_invitation' invite.id 'decline' %}" class="flex-1 text-center border border-gray-300 text-gray-700 px-3 py-1.5 rounded text-xs hover:bg-gray-50 transition">ปฏิเสธ</a>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="p-8 text-center text-gray-400 flex flex-col items-center">
+                        <div class="bg-gray-100 p-3 rounded-full mb-3">
+                            <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                        </div>
+                        <p class="text-sm font-medium text-gray-500">ไม่มีคำเชิญใหม่</p>
+                        <p class="text-xs text-gray-400 mt-1">คำเชิญจากเพื่อนร่วมทีมจะปรากฏที่นี่</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            {# ================================================= #}
+            {# 3. ตารางเรียน (Class Schedule Widget) - UPDATED   #}
+            {# ================================================= #}
+            <div x-data="{ 
+                openScheduleModal: false, 
+                mode: 'view', 
+                tab: 'google', 
+                manualName: '', 
+                googleName: '' 
+            }">
+                
+                {# 3.1 ปุ่ม Widget หน้า Dashboard (ปรับให้ใหญ่และเด่นขึ้น) #}
+                <div @click="openScheduleModal = true; mode = 'view'" 
+                     class="bg-linear-to-r from-indigo-500 to-purple-600 rounded-xl shadow-lg border border-indigo-400 p-6 text-white cursor-pointer hover:shadow-xl hover:scale-[1.02] transition transform group">
+                    
+                    <div class="flex justify-between items-center mb-4">
+                        <div class="flex items-center gap-3">
+                            <div class="bg-white/20 p-3 rounded-full">
+                                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-bold">ตารางเรียนของฉัน</h3>
+                                <p class="text-indigo-100 text-sm">แตะเพื่อดูภาพรวมรายสัปดาห์</p>
+                            </div>
+                        </div>
+                        <div class="bg-white/20 p-2 rounded-lg group-hover:bg-white/30 transition">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                        </div>
+                    </div>
+
+                    {# Preview เล็กๆ (แสดง 2 วิชาวันนี้ ถ้ามี) #}
+                    <div class="space-y-2">
+                        {% if my_schedules %}
+                            {% for sched in my_schedules|slice:":2" %}
+                            <div class="bg-white/10 rounded px-3 py-2 flex justify-between items-center text-sm backdrop-blur-sm border border-white/10">
+                                <span class="font-medium truncate w-32">{{ sched.subject_name }}</span>
+                                <span class="text-xs opacity-80">{{ sched.get_day_display|slice:":3" }} • {{ sched.start_time|time:"H:i" }}</span>
+                            </div>
+                            {% endfor %}
+                            {% if my_schedules|length > 2 %}
+                                <div class="text-center text-xs opacity-70 mt-1">+ อีก {{ my_schedules|length|add:"-2" }} วิชา</div>
+                            {% endif %}
+                        {% else %}
+                            <div class="text-center py-2 text-indigo-100 text-sm border border-dashed border-indigo-300/50 rounded">
+                                ยังไม่มีตารางเรียน กดเพื่อเพิ่ม
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {# ========================================= #}
+                {# MODAL: ตารางเรียนรวม & เพิ่มวิชา           #}
+                {# ========================================= #}
+                <div x-cloak x-show="openScheduleModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div @click.outside="openScheduleModal = false" class="bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[90vh] overflow-hidden flex flex-col">
+                        
+                        {# Header #}
+                        <div class="bg-indigo-600 px-6 py-4 flex justify-between items-center shrink-0">
+                            <div class="flex items-center gap-3">
+                                <h3 class="text-white font-bold text-lg" x-text="mode === 'view' ? '📅 ตารางเรียน (Schedule)' : '➕ เพิ่มวิชาเรียนใหม่'"></h3>
+                            </div>
+                            <div class="flex gap-3">
+                                <button x-show="mode === 'view'" @click="mode = 'add'" class="bg-white text-indigo-600 px-3 py-1.5 rounded-lg text-sm font-bold hover:bg-indigo-50 transition shadow-sm">
+                                    + เพิ่มวิชา
+                                </button>
+                                <button x-show="mode === 'add'" @click="mode = 'view'" class="bg-white/20 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-white/30 transition">
+                                    &larr; กลับไปดูตาราง
+                                </button>
+                                <button @click="openScheduleModal = false" class="text-white/70 hover:text-white text-2xl leading-none">&times;</button>
+                            </div>
+                        </div>
+
+                        {# Body #}
+                        <div class="overflow-y-auto p-6 bg-gray-50 flex-1">
+                            
+                            {# --- MODE 1: VIEW TIMELINE (ตารางแนวนอน) --- #}
+                            {# 🟢 ปรับ UI ตรงนี้ให้สะอาดขึ้น (Clean Style) #}
+                            <div x-show="mode === 'view'">
+                                <div class="bg-white p-4 rounded-xl shadow-md border border-gray-200 overflow-x-auto">
+                                    <div class="min-w-[1000px]">
+                                        <table class="w-full border-collapse border border-gray-200 text-sm">
+                                            <thead>
+                                                <tr class="bg-gray-100 text-gray-700">
+                                                    <th class="border border-gray-200 p-3 w-20 font-bold">วัน/เวลา</th>
+                                                    <th class="border border-gray-200 p-3 w-[10%]">8:30</th>
+                                                    <th class="border border-gray-200 p-3 w-[10%]">9:30</th>
+                                                    <th class="border border-gray-200 p-3 w-[10%]">10:30</th>
+                                                    <th class="border border-gray-200 p-3 w-[10%]">11:30</th>
+                                                    <th class="border border-gray-200 p-3 w-[10%]">12:30</th>
+                                                    <th class="border border-gray-200 p-3 w-[10%]">13:30</th>
+                                                    <th class="border border-gray-200 p-3 w-[10%]">14:30</th>
+                                                    <th class="border border-gray-200 p-3 w-[10%]">15:30</th>
+                                                    <th class="border border-gray-200 p-3 w-[10%]">16:30</th>
+                                                </tr>
+                                            </thead>
+
+                                            <tbody class="text-center font-medium text-gray-600">
+                                                {% for day_code, day_name in days_list %}
+                                                <tr class="h-20 border-b border-gray-100 last:border-0">
+                                                    <td class="bg-gray-50 text-gray-800 border-r border-gray-200 font-bold relative">
+                                                        {{ day_name }}
+                                                        {# แถบสีเล็กๆ บอกวันหยุด #}
+                                                        {% if day_code == 'Sat' or day_code == 'Sun' %}
+                                                            <div class="absolute left-0 top-0 bottom-0 w-1 bg-red-400"></div>
+                                                        {% else %}
+                                                            <div class="absolute left-0 top-0 bottom-0 w-1 bg-indigo-400"></div>
+                                                        {% endif %}
+                                                    </td>
+                                                    <td colspan="10" class="p-0 relative h-20 align-top">
+                                                        {# เส้นแบ่ง Grid จางๆ #}
+                                                        <div class="grid grid-cols-10 h-full absolute inset-0 pointer-events-none">
+                                                            {% for i in "1234567890"|make_list %}<div class="border-r border-gray-100 h-full"></div>{% endfor %}
+                                                        </div>
+
+                                                        {# แสดงวิชา (Style: Modern Clean) #}
+                                                        {% for sched in my_schedules %}
+                                                            {% if sched.day == day_code %}
+                                                                <div class="absolute top-1 bottom-1 mx-0.5 rounded-lg px-2 py-1 shadow-sm cursor-pointer group flex flex-col justify-center transition-all z-10 hover:z-20 hover:scale-[1.02] bg-indigo-50 border border-indigo-200 text-indigo-800 hover:bg-indigo-100"
+                                                                     style="left: {{ sched.style_left }}%; width: {{ sched.style_width }}%;">
+                                                                    
+                                                                    <div class="font-bold truncate text-xs sm:text-sm">{{ sched.subject_name }}</div>
+                                                                    <div class="opacity-70 text-[10px]">{{ sched.start_time|time:"H:i" }} - {{ sched.end_time|time:"H:i" }}</div>
+                                                                    
+                                                                    <form action="{% url 'delete_class_schedule' sched.id %}" method="POST" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                        {% csrf_token %}
+                                                                        <button type="submit" onclick="return confirm('ลบ?')" class="text-gray-400 hover:text-red-500 bg-white rounded-full w-5 h-5 flex items-center justify-center shadow-sm">&times;</button>
+                                                                    </form>
+                                                                </div>
+                                                            {% endif %}
+                                                        {% endfor %}
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
-                            </td>
-                            <td class="px-6 py-4">
-                                <span class="px-2 py-0.5 inline-flex text-xs font-semibold rounded-full 
-                                    {% if item.obj.status == 'todo' %}bg-gray-100 text-gray-600
-                                    {% elif item.obj.status == 'in_progress' %}bg-blue-100 text-blue-600
-                                    {% endif %}">
-                                    {{ item.obj.get_status_display }}
-                                </span>
-                            </td>
-                            <td class="px-6 py-4">
-                                {% if item.obj.due_date %}
-                                    <div class="flex items-center gap-2 text-sm">
-                                        {# แสดงวันที่ + สีตามสถานะ #}
-                                        {% if item.is_overdue %}
-                                            <span class="text-red-600 font-bold flex items-center gap-1">
-                                                 {{ item.obj.due_date|date:"d M" }}
-                                            </span>
-                                        {% elif item.is_week %}
-                                            <span class="text-orange-500 font-medium flex items-center gap-1">
-                                                 {{ item.obj.due_date|date:"d M" }}
-                                            </span>
+                            </div>
+
+                            {# --- MODE 2: ADD FORM --- #}
+                            <div x-show="mode === 'add'" class="max-w-md mx-auto bg-white p-6 rounded-xl shadow-sm border border-gray-100 mt-10">
+                                
+                                <div class="flex gap-2 mb-6 bg-gray-100 p-1.5 rounded-xl">
+                                    <button @click="tab = 'google'" :class="tab === 'google' ? 'bg-white shadow text-indigo-600' : 'text-gray-500 hover:text-gray-700'" class="flex-1 py-2 text-sm font-bold rounded-lg transition">จาก Google Calendar</button>
+                                    <button @click="tab = 'manual'" :class="tab === 'manual' ? 'bg-white shadow text-indigo-600' : 'text-gray-500 hover:text-gray-700'" class="flex-1 py-2 text-sm font-bold rounded-lg transition">เขียนเอง</button>
+                                </div>
+
+                                <form action="{% url 'create_class_schedule' %}" method="POST" class="space-y-5"
+                                      @submit.prevent="if(tab==='manual' && !manualName){alert('กรุณากรอกชื่อวิชา');return;} if(tab==='google' && !googleName){alert('เลือกวิชา');return;} $el.submit();">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="subject_name" :value="tab === 'manual' ? manualName : googleName">
+
+                                    <div x-show="tab === 'google'">
+                                        <label class="block text-sm font-bold text-gray-700 mb-1.5">เลือกวิชาจาก Google</label>
+                                        {% if google_course_names %}
+                                            <select x-model="googleName" class="w-full border-gray-300 rounded-lg py-2.5">
+                                                <option value="">-- เลือกรายวิชา --</option>
+                                                {% for course in google_course_names %}
+                                                    <option value="{{ course }}">{{ course }}</option>
+                                                {% endfor %}
+                                            </select>
                                         {% else %}
-                                            <span class="text-gray-500">
-                                                {{ item.obj.due_date|date:"d M" }}
-                                            </span>
+                                            <div class="text-sm text-red-500">ไม่พบข้อมูล (ลอง Sync ใหม่)</div>
                                         {% endif %}
                                     </div>
-                                {% else %}
-                                    <span class="text-gray-300">-</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="4" class="px-6 py-8 text-center text-gray-400">
-                                ไม่มีงานค้างในขณะนี้ 
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                
-                {# ข้อความเมื่อกด Filter แล้วไม่เจอข้อมูล (Optional) #}
-                <div x-show="filter === 'overdue' && {{ counts.overdue }} === 0" class="p-8 text-center text-gray-400 bg-white hidden" :class="{'block': true, 'hidden': false}">
-                     ไม่มีงานที่เลยกำหนด
-                </div>
-                 <div x-show="filter === 'week' && {{ counts.week }} === 0" class="p-8 text-center text-gray-400 bg-white hidden" :class="{'block': true, 'hidden': false}">
-                     ไม่มีงานที่ต้องส่งในสัปดาห์นี้
-                </div>
-            </div>
-        </div>
-    </div>
 
-    {# ================================================= #}
-    {# 2. กล่องจดหมาย / คำเชิญ (Invitations Box)         #}
-    {#    (ย้ายลงมาอยู่ใต้ Task Summary)                  #}
-    {# ================================================= #}
-    {% if received_invites %}
-    <div class="bg-white rounded-xl shadow-md border-l-4 border-indigo-500 overflow-hidden">
-        <div class="p-4 bg-indigo-50 border-b border-indigo-100 flex justify-between items-center">
-            <h3 class="text-indigo-900 font-bold flex items-center gap-2">
-                 คำเชิญเข้าร่วมโปรเจกต์ใหม่ ({{ received_invites.count }})
-            </h3>
-        </div>
-        <div class="divide-y divide-gray-100">
-            {% for invite in received_invites %}
-            <div class="p-4 flex flex-col sm:flex-row justify-between items-center gap-4 hover:bg-gray-50 transition-colors">
-                <div class="flex items-center gap-3">
-                    {# Avatar คนเชิญ #}
-                    <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
-                        {{ invite.sender.username.0|upper }}
-                    </div>
-                    <div>
-                        <p class="text-gray-800 text-sm">
-                            <span class="font-bold">{{ invite.sender.username }}</span> เชิญคุณเข้าร่วม
-                        </p>
-                        <p class="text-indigo-600 font-bold text-lg leading-tight">
-                            "{{ invite.board.name }}"
-                        </p>
+                                    <div x-show="tab === 'manual'">
+                                        <label class="block text-sm font-bold text-gray-700 mb-1.5">ชื่อวิชา</label>
+                                        <input type="text" x-model="manualName" class="w-full border-gray-300 rounded-lg py-2.5" placeholder="เช่น Math 101">
+                                    </div>
+
+                                    <div class="grid grid-cols-2 gap-4 pt-4 border-t border-gray-100">
+                                        <div class="col-span-2">
+                                            <label class="block text-xs font-bold text-gray-500 mb-1">วันเรียน</label>
+                                            {{ schedule_form.day }}
+                                        </div>
+                                        <div><label class="block text-xs font-bold text-gray-500 mb-1">เริ่ม</label>{{ schedule_form.start_time }}</div>
+                                        <div><label class="block text-xs font-bold text-gray-500 mb-1">เลิก</label>{{ schedule_form.end_time }}</div>
+                                    </div>
+
+                                    <button type="submit" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold mt-4">บันทึกตารางเรียน</button>
+                                </form>
+                            </div>
+
+                        </div>
                     </div>
                 </div>
-                <div class="flex gap-2 w-full sm:w-auto">
-                    <a href="{% url 'respond_invitation' invite.id 'accept' %}" class="flex-1 sm:flex-none text-center bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 shadow-sm transition-all">
-                        ตอบรับ
-                    </a>
-                    <a href="{% url 'respond_invitation' invite.id 'decline' %}" class="flex-1 sm:flex-none text-center bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 hover:text-red-600 transition-all">
-                        ปฏิเสธ
-                    </a>
-                </div>
             </div>
-            {% endfor %}
-        </div>
+
+        </div> {# จบคอลัมน์ขวา #}
     </div>
-    {% endif %}
-
-    {# ส่วนแสดงโปรเจกต์ทั้งหมด ถูกลบออกไปแล้ว #}
-
-</div>
+</div>  
 {% endblock %}

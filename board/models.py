@@ -223,3 +223,24 @@ class ActivityLog(models.Model):
 
     def __str__(self):
         return f"{self.actor.username} - {self.action}"
+
+class ClassSchedule(models.Model):
+    DAYS = [
+        ('Mon', 'Monday'),
+        ('Tue', 'Tuesday'),
+        ('Wed', 'Wednesday'),
+        ('Thu', 'Thursday'),
+        ('Fri', 'Friday'),
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    subject_name = models.CharField(max_length=100)
+    day = models.CharField(max_length=3, choices=DAYS)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    
+    # ถ้าดึงมาจาก Google Calendar อาจจะเก็บ Event ID ไว้
+    google_event_id = models.CharField(max_length=255, blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.subject_name} ({self.day})"

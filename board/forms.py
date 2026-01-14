@@ -1,6 +1,6 @@
 # boards/forms.py
 from django import forms
-from .models import Board, List, Task   # 👈 ใช้ Task แทน Card
+from .models import Board, List, Task, ClassSchedule   
 from users.models import User
 
 
@@ -81,3 +81,14 @@ class TaskForm(forms.ModelForm):
                 })
             else:
                 field.widget.attrs.update({"class": base})
+
+class ClassScheduleForm(forms.ModelForm):
+    class Meta:
+        model = ClassSchedule
+        fields = ['subject_name', 'day', 'start_time', 'end_time']
+        widgets = {
+            'subject_name': forms.TextInput(attrs={'class': 'w-full text-sm border-gray-300 rounded-md', 'placeholder': 'ชื่อวิชา (เช่น Math 101)'}),
+            'day': forms.Select(attrs={'class': 'w-full text-sm border-gray-300 rounded-md'}),
+            'start_time': forms.TimeInput(attrs={'type': 'time', 'class': 'w-full text-sm border-gray-300 rounded-md'}),
+            'end_time': forms.TimeInput(attrs={'type': 'time', 'class': 'w-full text-sm border-gray-300 rounded-md'}),
+        }
