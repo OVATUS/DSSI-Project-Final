@@ -52,14 +52,29 @@
     }
   "
 >
-    {# --- 1. Checkbox (มุมขวาบน แบบลอย) --- #}
-    <div class="absolute top-2.5 right-2.5 z-10" @click.stop> 
+    {# --- 1. Top Section: Checkbox & Labels --- #}
+    <div class="flex justify-between items-start ">
+        {# Labels #}
+        <div class="flex flex-wrap gap-1.5 flex-1 pr-8"> 
+            {% if task.labels.all %}
+                {% for label in task.labels.all %}
+                <div
+                    class="h-2 w-8 rounded-full {{ label.color }} shadow-sm opacity-90 hover:opacity-100 transition-all hover:scale-105 hover:w-10 duration-200"
+                    title="{{ label.name }}"
+                ></div>
+                {% endfor %}
+            {% else %}
+                <div class="h-2"></div> {# Spacer if no labels #}
+            {% endif %}
+        </div>
+
+        {# Checkbox (ลอยขวาบนสุด) #}
         <button 
             type="button"
-            @click="fetch('{% url 'task_toggle_complete' task.id %}', { method: 'POST', headers: {'X-CSRFToken': '{{ csrf_token }}'} })
+            @click.stop="fetch('{% url 'task_toggle_complete' task.id %}', { method: 'POST', headers: {'X-CSRFToken': '{{ csrf_token }}'} })
                     .then(res => res.json())
                     .then(data => { if(data.success) isCompleted = data.is_completed })"
-            class="w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all duration-200 shadow-sm"
+            class="w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all duration-200 shadow-sm shrink-0"
             :class="isCompleted ? 'bg-green-500 border-green-500 text-white' : 'border-gray-200 hover:border-indigo-400 bg-white opacity-0 group-hover:opacity-100'"
             title="ทำเครื่องหมายว่าเสร็จ"
         >
@@ -69,53 +84,15 @@
         </button>
     </div>
 
-    {# --- 2. Labels --- #}
-    {% if task.labels.all %}
-    <div class="flex flex-wrap gap-1.5 mb-1 pr-6">
-        {% for label in task.labels.all %}
-        <div
-            class="h-2 w-8 rounded-full {{ label.color }} shadow-sm opacity-90 hover:opacity-100 transition-all hover:scale-105 hover:w-10 duration-200"
-            title="{{ label.name }}"
-        ></div>
-        {% endfor %}
-    </div>
-    {% endif %}
+    {# --- 2. Title --- #}
+    <h3 class="text-sm font-semibold text-gray-800 leading-snug wrap-break-words transition-all ">
+        {{ task.title }}
+    </h3>
 
-    {# --- 3. Title & Actions --- #}
-    <div class="flex justify-between items-start gap-2 relative">
-        {# ✅ เอา class line-through ออกแล้ว #}
-        <h3 class="text-sm font-semibold text-gray-800 leading-snug wrap-break-words pr-6 transition-all">
-            {{ task.title }}
-        </h3>
+    {# --- 3. Footer Info & User & Archive --- #}
+    <div class="flex items-end justify-between mt-auto pt- border-t border-transparent group-hover:border-gray-50 transition-colors">
         
-        {# ปุ่ม Archive #}
-        <div class="absolute right-0 top-0 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-white/80 backdrop-blur-sm rounded-md pl-1">
-             <button 
-                type="button"
-                class="text-gray-400 hover:text-red-500 p-1 rounded-md hover:bg-red-50 transition-colors"
-                title="เก็บถาวร (Archive)"
-                @click.stop="
-                    if(confirm('ยืนยันเก็บถาวรงานนี้?')) {
-                        fetch('{% url "toggle_task_archive" task.id %}', {
-                            method: 'POST',
-                            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
-                        })
-                        .then(res => {
-                            if(res.ok) window.location.reload();
-                            else alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
-                        });
-                    }
-                "
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-            </button>
-        </div>
-    </div>
-
-    {# --- 4. Footer Info --- #}
-    <div class="flex items-end justify-between mt-auto pt-2">
+        {# Left: Meta Info #}
         <div class="flex items-center flex-wrap gap-2 text-gray-400">
             {% if task.due_date %}
             <div 
@@ -132,6 +109,7 @@
             </div>
             {% endif %}
 
+            {# Icons: Comments / Checklist / Attachments #}
             <div class="flex items-center gap-2 text-[10px]">
                 {% if task.comments.exists %}
                 <div class="flex items-center gap-0.5 hover:text-gray-600" title="ความคิดเห็น">
@@ -156,16 +134,42 @@
             </div>
         </div>
 
-        {% if task.assigned_to %}
-        <div class="pl-2 shrink-0">
-            {% if task.assigned_to.profile_image %}
-                <img src="{{ task.assigned_to.profile_image.url }}" class="w-6 h-6 rounded-full object-cover border-2 border-white shadow-sm hover:scale-110 transition-transform" title="รับผิดชอบโดย: {{ task.assigned_to.username }}">
-            {% else %}
-                <div class="w-6 h-6 rounded-full bg-linear-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center text-[9px] font-bold border-2 border-white shadow-sm hover:scale-110 transition-transform" title="รับผิดชอบโดย: {{ task.assigned_to.username }}">
-                    {{ task.assigned_to.username.0|upper }}
-                </div>
+        {# Right: User Avatar & Archive Button (อยู่คู่กัน) #}
+        <div class="flex items-center gap-1 pl-2 shrink-0">
+            
+            {# ปุ่ม Archive (ซ่อนอยู่ จะโผล่มาเมื่อ Hover Card) #}
+            <button 
+                type="button"
+                class="text-gray-300 hover:text-red-500 p-1 rounded-md hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
+                title="เก็บถาวร (Archive)"
+                @click.stop="
+                    if(confirm('ยืนยันเก็บถาวรงานนี้?')) {
+                        fetch('{% url "toggle_task_archive" task.id %}', {
+                            method: 'POST',
+                            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+                        })
+                        .then(res => {
+                            if(res.ok) window.location.reload();
+                            else alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+                        });
+                    }
+                "
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                </svg>
+            </button>
+
+            {# User Avatar #}
+            {% if task.assigned_to %}
+                {% if task.assigned_to.profile_image %}
+                    <img src="{{ task.assigned_to.profile_image.url }}" class="w-6 h-6 rounded-full object-cover border-2 border-white shadow-sm hover:scale-110 transition-transform" title="รับผิดชอบโดย: {{ task.assigned_to.username }}">
+                {% else %}
+                    <div class="w-6 h-6 rounded-full bg-linear-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center text-[9px] font-bold border-2 border-white shadow-sm hover:scale-110 transition-transform" title="รับผิดชอบโดย: {{ task.assigned_to.username }}">
+                        {{ task.assigned_to.username.0|upper }}
+                    </div>
+                {% endif %}
             {% endif %}
         </div>
-        {% endif %}
     </div>
 </div>

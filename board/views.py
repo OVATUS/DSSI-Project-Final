@@ -287,7 +287,7 @@ def task_create(request, list_id):
             import threading 
 
             # ==================================================
-            # 📧 ส่วนแจ้งเตือนการมอบหมายงาน (Internal + Email)
+            #  ส่วนแจ้งเตือนการมอบหมายงาน (Internal + Email)
             # ==================================================
             if task.assigned_to and task.assigned_to != request.user:
                 # 1. แจ้งเตือนในระบบ (กระดิ่งบนเว็บ)
@@ -317,7 +317,7 @@ def task_create(request, list_id):
                 if webhook_url: # ✅ เช็คว่ามี URL ไหม ถ้ามีค่อยส่ง
                     # ข้อความที่จะส่งเข้า Discord
                     discord_msg = (
-                        f"📝 **New Task Created!**\n"
+                        f" **New Task Created!**\n"
                         f"**Task:** {task.title}\n"
                         f"**Board:** {list_obj.board.name}\n"
                         f"**List:** {list_obj.title}\n"
@@ -423,7 +423,7 @@ def task_update(request, task_id):
                     )
 
             # -----------------------------------------------
-            # ✅ ส่วนแจ้งเตือน DISCORD (เพิ่มใหม่)
+            #  ส่วนแจ้งเตือน DISCORD (เพิ่มใหม่)
             # -----------------------------------------------
             import threading
             webhook_url = task.list.board.discord_webhook_url
@@ -433,7 +433,7 @@ def task_update(request, task_id):
                 if new_assigned_to != old_assigned_to:
                     assignee_name = new_assigned_to.username if new_assigned_to else "Unassigned"
                     msg = (
-                        f"🔄 **Task Updated**\n"
+                        f" **Task Updated**\n"
                         f"**Task:** {updated_task.title}\n"
                         f"**Assignee:** {assignee_name}\n"
                         f"**By:** {request.user.username}"
@@ -491,7 +491,7 @@ def task_move(request):
 
         # 1. ย้าย Task ไปลิสต์ใหม่ (ถ้ามีการเปลี่ยนลิสต์)
         if task.list != target_list:
-            old_list_title = task.list.title # เก็บชื่อเก่าไว้ทำ Log
+            old_list_title = task.list.title 
 
             # เปลี่ยนลิสต์ใหม่
             task.list = target_list
@@ -608,7 +608,7 @@ def send_invitation_email(invite, sender):
     if not invite.recipient.email:
         return
 
-    subject = f"📨 คำเชิญเข้าร่วมบอร์ด: {invite.board.name}"
+    subject = f" คำเชิญเข้าร่วมบอร์ด: {invite.board.name}"
     message = (
         f"สวัสดีคุณ {invite.recipient.username},\n\n"
         f"คุณ {sender.username} ได้เชิญคุณเข้าร่วมโปรเจกต์ '{invite.board.name}'\n\n"
@@ -635,7 +635,7 @@ def add_member(request, board_id):
     try:
         user_to_invite = User.objects.get(username=username)
         
-        # ... (โค้ดเช็คเงื่อนไขเดิม) ...
+        .
         if user_to_invite in board.members.all() or user_to_invite == board.created_by:
             pass
         else:
@@ -653,11 +653,11 @@ def add_member(request, board_id):
                     recipient=user_to_invite
                 )
                 
-                # 🟢 2. สร้าง Notification (เพิ่มใหม่ตรงนี้!)
+                #  2. สร้าง Notification (เพิ่มใหม่ตรงนี้!)
                 Notification.objects.create(
                     recipient=user_to_invite,
                     actor=request.user,
-                    board=board,  # ระบุบอร์ด
+                    board=board,  
                     message=f"ได้เชิญคุณเข้าร่วมบอร์ด '{board.name}'"
                 )
 
@@ -670,7 +670,6 @@ def add_member(request, board_id):
 def remove_member(request, board_id, user_id):
     board = get_object_or_404(Board, id=board_id)
     
-    # เฉพาะเจ้าของบอร์ดเท่านั้นที่มีสิทธิ์ลบ
     if request.user != board.created_by:
         return JsonResponse({'error': 'Permission denied'}, status=403)
 
@@ -686,7 +685,6 @@ def respond_invitation(request, invite_id, action):
     if action == 'accept':
         invite.status = 'accepted'
         invite.save()
-        # เพิ่มเข้าบอร์ดจริงๆ
         invite.board.members.add(request.user)
     elif action == 'decline':
         invite.status = 'declined'
@@ -767,8 +765,7 @@ def add_comment(request, task_id):
         # 1. สร้างคอมเมนต์
         comment = Comment.objects.create(task=task, author=request.user, content=content)
         
-        # ✅ [ส่วนที่เพิ่ม] Logic แจ้งเตือน Comment
-        # แจ้งเตือนเจ้าของงาน (Assignee) ถ้ามีคนมอบหมาย และคนเม้นไม่ใช่เจ้าของงานเอง
+        
         if task.assigned_to and task.assigned_to != request.user:
             Notification.objects.create(
                 recipient=task.assigned_to,
@@ -880,18 +877,17 @@ def delete_checklist_item(request, item_id):
     item.delete()
     return JsonResponse({'success': True})
 
-# ------------------------------#
+
 # ------------------------------#
 #         Attachment VIEWS
 #-------------------------------#
-# ------------------------------#
+
 
 @login_required
 @require_POST
 def create_attachment(request, task_id):
     task = get_object_or_404(Task, id=task_id)
     
-    # รับไฟล์จาก request.FILES
     if 'file' in request.FILES:
         file = request.FILES['file']
         attachment = Attachment.objects.create(task=task, file=file)
@@ -912,15 +908,13 @@ def create_attachment(request, task_id):
 def delete_attachment(request, attachment_id):
     attachment = get_object_or_404(Attachment, id=attachment_id)
     attachment.delete()
-    # หมายเหตุ: ปกติ Django จะลบ record ใน DB แต่ไฟล์จริงอาจจะยังอยู่
-    # ถ้าอยากให้ลบไฟล์จริงด้วย ต้องใช้ signal หรือ library เสริม (แต่เบื้องต้นแค่นี้ก่อนได้ครับ)
     return JsonResponse({'success': True})
 
-# ------------------------------#
+
 # ------------------------------#
 #         notifications VIEWS
 #-------------------------------#
-# ------------------------------#
+
 
 @login_required
 def get_notifications(request):
@@ -934,8 +928,7 @@ def get_notifications(request):
         if n.actor and hasattr(n.actor, 'profile_image') and n.actor.profile_image:
             avatar_url = n.actor.profile_image.url
 
-        # 2. หา Board ID จาก Task (เพราะ Notification ผูกกับ Task)
-        # Model ของคุณคือ Notification -> Task -> List -> Board
+        
         board_id = None
         if n.task and n.task.list and n.task.list.board:
             board_id = n.task.list.board.id
@@ -944,10 +937,10 @@ def get_notifications(request):
             'id': n.id,
             'actor': n.actor.username if n.actor else 'ระบบ',
             'actor_avatar': avatar_url,
-            'message': n.message,  # ✅ แก้จาก n.verb เป็น n.message
+            'message': n.message,  
             'created_at': n.created_at.strftime('%d/%m %H:%M'),
             'is_read': n.is_read,
-            'board_id': board_id,  # ✅ ดึง ID จาก Task แทน target_board
+            'board_id': board_id,  
         })
     
     unread_count = Notification.objects.filter(recipient=request.user, is_read=False).count()
@@ -1185,12 +1178,8 @@ def google_calendar_init(request):
 
 @login_required
 def fetch_google_calendar_partial(request):
-    """
-    ดึงข้อมูลจาก Google Calendar แบบ Asynchronous
-    คืนค่าเป็น HTML ก้อนเล็กๆ (Partial) เพื่อนำไปแปะในหน้า Dashboard
-    """
-    google_events = []
-    
+
+    google_events = [] 
     # เช็คว่ามี Credentials ไหม
     if 'google_credentials' in request.session:
         try:
@@ -1269,13 +1258,13 @@ def fetch_google_calendar_partial(request):
         'google_events': google_events
     })
 
-# =============================#
-# ======= Reporting Views =======#
-# =============================#
+# =============================
+# ======= Reporting Views =====
+# =============================
 
 @login_required
 def reporting_view(request):
-    # ... (ส่วน Filter บอร์ด เหมือนเดิมเป๊ะ) ...
+    # ... (ส่วน Filter บอร์ด เหมือนเดิม) ...
     user_boards = Board.objects.filter(Q(created_by=request.user) | Q(members=request.user)).distinct()
     tasks = Task.objects.filter(list__board__in=user_boards, is_archived=False)
 
@@ -1286,24 +1275,27 @@ def reporting_view(request):
     else:
         current_board_name = "ทุกโปรเจกต์"
 
-    # --- ส่วนที่แก้: เตรียม QuerySet สำหรับ List แต่ละประเภท ---
-    
-    # 1. งานทั้งหมด
+    # ==========================================
+    # เตรียม QuerySet สำหรับ Modal List
+    # ==========================================
     all_tasks_qs = tasks.select_related('list__board', 'assigned_to').order_by('-created_at')
-    
-    # 2. งานที่เสร็จแล้ว
     completed_tasks_qs = tasks.filter(is_completed=True).select_related('list__board', 'assigned_to').order_by('-completed_at')
-    
-    # 3. งานล่าช้า
     overdue_tasks_qs = tasks.filter(due_date__lt=timezone.now(), is_completed=False).select_related('list__board', 'assigned_to').order_by('due_date')
+    remaining_tasks_qs = tasks.filter(is_completed=False).select_related('list__board', 'assigned_to').order_by('due_date')
 
-    # ตัวเลข KPI
+    # ==========================================
+    # คำนวณ KPIs
+    # ==========================================
     total_tasks = tasks.count()
     completed_tasks = completed_tasks_qs.count()
-    completion_rate = round((completed_tasks / total_tasks * 100), 1) if total_tasks > 0 else 0
+    remaining_count = remaining_tasks_qs.count()
     overdue_tasks = overdue_tasks_qs.count()
+    completion_rate = round((completed_tasks / total_tasks * 100), 1) if total_tasks > 0 else 0
 
-    # ... (ส่วน Priority Data และ Trend Data เหมือนเดิม) ...
+    # ==========================================
+    # เตรียมข้อมูลกราฟ (Charts Data)
+    # ==========================================
+
     # Chart 1: Priority
     priority_data = {
         'high': tasks.filter(priority='high', is_completed=False).count(),
@@ -1323,24 +1315,38 @@ def reporting_view(request):
     trend_labels = [item['date'].strftime('%d/%m') for item in completed_trend]
     trend_data = [item['count'] for item in completed_trend]
 
+    # Chart 3: Member Workload
+    member_stats = tasks.values('assigned_to__username').annotate(total=Count('id')).order_by('-total')
+    member_labels = [m['assigned_to__username'] if m['assigned_to__username'] else 'Unassigned' for m in member_stats]
+    member_data = [m['total'] for m in member_stats]
+
+    # Chart 4: Task Distribution (แก้ไขจุดที่ Error) ✅
+    # เปลี่ยนจาก 'list__order' เป็น 'list__position'
+    list_stats = tasks.values('list__title').annotate(count=Count('id')).order_by('list__position')
+    
+    list_labels = [l['list__title'] for l in list_stats]
+    list_data = [l['count'] for l in list_stats]
+
     context = {
         'boards': user_boards,
         'selected_board_id': selected_board_id,
         'current_board_name': current_board_name,
-        
         'total_tasks': total_tasks,
         'completed_tasks': completed_tasks,
+        'remaining_count': remaining_count,
         'completion_rate': completion_rate,
         'overdue_tasks': overdue_tasks,
-        
-        # ✅ ส่ง QuerySet ไปด้วย เพื่อเอาไปแสดงใน Modal
         'all_tasks_qs': all_tasks_qs,
         'completed_tasks_qs': completed_tasks_qs,
+        'remaining_tasks_qs': remaining_tasks_qs,
         'overdue_tasks_qs': overdue_tasks_qs,
-
         'priority_data': priority_data,
         'trend_labels': trend_labels,
         'trend_data': trend_data,
+        'member_labels': member_labels,
+        'member_data': member_data,
+        'list_labels': list_labels, #  ส่งข้อมูลกราฟใหม่
+        'list_data': list_data,     #  ส่งข้อมูลกราฟใหม่
     }
 
     return render(request, 'boards/reporting.html', context)
@@ -1368,14 +1374,14 @@ def send_email_notify(task, recipient):
         print(f"Email Warning: User {recipient.username} has no email address.")
         return
 
-    subject = f"🔔 งานใหม่: {task.title}"
+    subject = f" งานใหม่: {task.title}"
     message = (
         f"สวัสดีคุณ {recipient.username},\n\n"
         f"คุณได้รับมอบหมายงานใหม่ในระบบ Board Management\n\n"
-        f"📌 ชื่องาน: {task.title}\n"
-        f"📅 กำหนดส่ง: {task.due_date if task.due_date else 'ไม่ระบุ'}\n"
-        f"📂 โปรเจกต์: {task.list.board.name}\n"
-        f"👤 มอบหมายโดย: {task.created_by.username}\n\n"
+        f" ชื่องาน: {task.title}\n"
+        f" กำหนดส่ง: {task.due_date if task.due_date else 'ไม่ระบุ'}\n"
+        f" โปรเจกต์: {task.list.board.name}\n"
+        f" มอบหมายโดย: {task.created_by.username}\n\n"
         f"ตรวจสอบรายละเอียดได้ที่เว็บไซต์ของเรา"
     )
     
@@ -1387,9 +1393,9 @@ def send_email_notify(task, recipient):
             [recipient.email],
             fail_silently=False,
         )
-        print(f"✅ Email sent to {recipient.email}")
+        print(f" Email sent to {recipient.email}")
     except Exception as e:
-        print(f"❌ Email Error: {e}")
+        print(f" Email Error: {e}")
 
 @login_required
 @require_POST
@@ -1460,7 +1466,7 @@ def board_lsit_view(request):
         })
 
     # =================================================
-    # 4. ส่วน Google Calendar (แบบมี Caching 🚀) - UPDATED
+    # 4. ส่วน Google Calendar  - UPDATED
     # =================================================
     google_events = []
     google_course_names = []
@@ -1475,11 +1481,11 @@ def board_lsit_view(request):
         cached_courses = cache.get(cache_key_courses)
 
         if cached_events is not None and cached_courses is not None:
-            # ✅ เจอ! ใช้ข้อมูลเก่าเลย (เร็วมาก ไม่ต้องรอโหลด)
+            #  เจอ! ใช้ข้อมูลเก่าเลย (เร็วมาก ไม่ต้องรอโหลด)
             google_events = cached_events
             google_course_names = cached_courses
         else:
-            # ❌ ไม่เจอ (หรือหมดอายุ) ให้วิ่งไปถาม Google (ยอมช้าหน่อย)
+            #  ไม่เจอ (หรือหมดอายุ) ให้วิ่งไปถาม Google (ยอมช้าหน่อย)
             try:
                 creds_data = request.session['google_credentials']
                 creds = Credentials(**creds_data)
@@ -1554,7 +1560,7 @@ def board_lsit_view(request):
                 google_events = final_events
                 google_course_names = temp_course_names
 
-                # 5. บันทึกลง Cache (จำไว้ 15 นาที = 900 วินาที) 💾
+                # 5. บันทึกลง Cache (จำไว้ 15 นาที = 900 วินาที) 
                 cache.set(cache_key_events, google_events, 900)
                 cache.set(cache_key_courses, google_course_names, 900)
                 
@@ -1562,29 +1568,48 @@ def board_lsit_view(request):
                 print(f"Google API Error: {e}")
 
     # =================================================
-    # 5. ส่วนตารางเรียน (Schedule Calculation Logic) ✅
+    # 5. ส่วนตารางเรียน (Schedule Calculation Logic) 
     # =================================================
     raw_schedules = ClassSchedule.objects.filter(user=request.user)
     my_schedules = []
     
-    START_BASE_MIN = 510  # 8:30
-    TOTAL_RANGE_MIN = 540 # 9 Hours
+    # ตั้งค่าขอบเขตเวลาของตาราง (08:30 - 17:30)
+    START_BASE_MIN = 510   # 08:30 (8*60 + 30)
+    END_BASE_MIN = 1050    # 17:30 (17*60 + 30)
+    TOTAL_RANGE_MIN = 540  # 9 ชั่วโมง (540 นาที)
 
     for sched in raw_schedules:
-        # คำนวณ Left
         start_h = sched.start_time.hour
         start_m = sched.start_time.minute
-        start_total_min = (start_h * 60) + start_m
-        left_percent = ((start_total_min - START_BASE_MIN) / TOTAL_RANGE_MIN) * 100
-        sched.style_left = max(0, min(100, left_percent))
+        start_total = (start_h * 60) + start_m
 
-        # คำนวณ Width
         end_h = sched.end_time.hour
         end_m = sched.end_time.minute
-        end_total_min = (end_h * 60) + end_m
-        duration = end_total_min - start_total_min
-        width_percent = (duration / TOTAL_RANGE_MIN) * 100
-        sched.style_width = max(0, width_percent)
+        end_total = (end_h * 60) + end_m
+
+        # 1. คำนวณจุดเริ่ม (Left %)
+        # ถ้าเริ่มก่อน 08:30 ให้ปัดเป็น 08:30 (เพื่อให้ Left เป็น 0%)
+        effective_start = max(start_total, START_BASE_MIN)
+        
+        # ถ้าเริ่มหลัง 17:30 (อยู่นอกตาราง) ให้ข้าม หรือปัดเป็น 100%
+        if effective_start >= END_BASE_MIN:
+             continue 
+
+        left_percent = ((effective_start - START_BASE_MIN) / TOTAL_RANGE_MIN) * 100
+        sched.style_left = max(0, min(100, left_percent))
+
+        # 2. คำนวณความกว้าง (Width %)  แก้ตรงนี้
+       
+        effective_end = min(end_total, END_BASE_MIN)
+        
+        # ความกว้าง = (เวลาจบที่ปรับแล้ว - เวลาเริ่มที่ปรับแล้ว)
+        visible_duration = effective_end - effective_start
+        
+        # ป้องกันค่าติดลบกรณีข้อมูลผิดพลาด
+        visible_duration = max(0, visible_duration)
+
+        width_percent = (visible_duration / TOTAL_RANGE_MIN) * 100
+        sched.style_width = width_percent # ไม่ต้อง max(0) ซ้ำเพราะจัดการ visible_duration แล้ว
         
         my_schedules.append(sched)
 
@@ -1593,9 +1618,6 @@ def board_lsit_view(request):
         ('Thu', 'พฤ.'), ('Fri', 'ศ.'), ('Sat', 'ส.'), ('Sun', 'อา.')
     ]
 
-    # =================================================
-    # 6. รวมข้อมูลส่งไปหน้าเว็บ
-    # =================================================
     context = {
         'received_invites': received_invites,
         'boards': boards,
@@ -1621,7 +1643,7 @@ def create_class_schedule(request):
             schedule.save()
     return redirect('home') # หรือชื่อ URL หน้า dashboard ของคุณ
 
-# ✅ เพิ่ม View สำหรับลบ
+
 @login_required
 def delete_class_schedule(request, schedule_id):
     schedule = get_object_or_404(ClassSchedule, id=schedule_id, user=request.user)

@@ -34,11 +34,31 @@
 
       {# --- HEADER --- #}
       <header class="h-16 shrink-0 bg-white/80 backdrop-blur-md border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 shadow-sm z-30 w-full relative">
-        {# ... (เนื้อหา Header เหมือนเดิม) ... #}
+        
+        {# Left Side: Back Button + Title + Star #}
         <div class="flex items-center gap-3 sm:gap-4 min-w-0 mr-4">
-           <div class="bg-indigo-600 text-white p-2 rounded-lg shadow-sm shrink-0 hidden sm:block"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" /></svg></div>
-           <h1 class="text-lg sm:text-xl font-bold text-gray-800 tracking-tight truncate max-w-[150px] sm:max-w-xs">{{ board.name }}</h1>
-           <button type="button" x-data="{ starred: {% if request.user in board.starred_by.all %}true{% else %}false{% endif %} }" @click="fetch('{% url 'board_star' board.id %}', { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' } }).then(res => res.json()).then(data => { starred = data.is_starred; })" class="p-1.5 rounded-full transition-colors border border-transparent hover:bg-gray-100 focus:outline-none" :class="starred ? 'text-yellow-400' : 'text-gray-300 hover:text-yellow-400'" title="ติดดาวบอร์ดนี้"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" :fill="starred ? 'currentColor' : 'none'" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg></button>
+            
+            {# ✅ ปุ่มย้อนกลับ (Back Button) #}
+            <a href="{% url 'project_page' %}" class="text-gray-400 hover:text-indigo-600 hover:bg-gray-100 p-2 rounded-full transition-colors" title="กลับไปหน้ารวมโปรเจกต์">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+            </a>
+
+            {# Icon Board (ซ่อนบนมือถือเพื่อประหยัดที่) #}
+            <div class="bg-indigo-600 text-white p-2 rounded-lg shadow-sm shrink-0 hidden sm:block">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" /></svg>
+            </div>
+
+            {# Board Name #}
+            <h1 class="text-lg sm:text-xl font-bold text-gray-800 tracking-tight truncate max-w-[150px] sm:max-w-xs">
+                {{ board.name }}
+            </h1>
+
+            {# Star Button #}
+            <button type="button" x-data="{ starred: {% if request.user in board.starred_by.all %}true{% else %}false{% endif %} }" @click="fetch('{% url 'board_star' board.id %}', { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' } }).then(res => res.json()).then(data => { starred = data.is_starred; })" class="p-1.5 rounded-full transition-colors border border-transparent hover:bg-gray-100 focus:outline-none" :class="starred ? 'text-yellow-400' : 'text-gray-300 hover:text-yellow-400'" title="ติดดาวบอร์ดนี้">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" :fill="starred ? 'currentColor' : 'none'" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>
+            </button>
         </div>
 
         <div class="flex items-center gap-2 sm:gap-3 ml-auto">

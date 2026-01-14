@@ -14,7 +14,7 @@
             <div x-data="{ filter: 'all' }">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
                     <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2">
-                         📝 งานของฉัน (My Tasks)
+                          งานของฉัน (My Tasks)
                     </h2>
                     
                     {# ปุ่มตัวกรอง #}
@@ -103,7 +103,7 @@
                             >
                                 <div>
                                     <div class="text-xs text-blue-600 font-semibold mb-1 flex items-center gap-1">
-                                        📅 {{ event.start|date:"d M Y, H:i" }}
+                                         {{ event.start|date:"d M Y, H:i" }}
                                     </div>
                                     <div class="font-bold text-gray-800 text-sm mb-2 group-hover:text-blue-600 leading-tight">
                                         {{ event.title }}
@@ -139,15 +139,15 @@
         </div>
 
         {# ======================================================= #}
-        {# [RIGHT COLUMN] (1/3): คำเชิญ (ย้ายมา) + แสดงตลอดเวลา     #}
+        {#                  [RIGHT COLUMN]  คำเชิญ                  #}
         {# ======================================================= #}
         <div class="lg:col-span-1">
             
             {# 3. คำเชิญ (Invitations Box) #}
-            <div class="bg-white rounded-xl shadow-md border-l-4 border-indigo-500 overflow-hidden sticky top-8 mb-8">
+            <div class="bg-white rounded-xl shadow-md border-l-4 border-indigo-500 overflow-hidden  mb-8">
                 <div class="p-4 bg-indigo-50 border-b border-indigo-100 flex justify-between items-center">
                     <h3 class="text-indigo-900 font-bold flex items-center gap-2 text-base">
-                        📩 คำเชิญเข้าร่วม
+                         คำเชิญเข้าร่วม
                         {% if received_invites %}
                             <span class="bg-indigo-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">{{ received_invites.count }}</span>
                         {% endif %}
@@ -177,7 +177,6 @@
                             <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
                         </div>
                         <p class="text-sm font-medium text-gray-500">ไม่มีคำเชิญใหม่</p>
-                        <p class="text-xs text-gray-400 mt-1">คำเชิญจากเพื่อนร่วมทีมจะปรากฏที่นี่</p>
                     </div>
                     {% endfor %}
                 </div>
@@ -194,39 +193,48 @@
                 googleName: '' 
             }">
                 
-                {# 3.1 ปุ่ม Widget หน้า Dashboard (ปรับให้ใหญ่และเด่นขึ้น) #}
+                {# 3.1 ปุ่ม Widget หน้า Dashboard (ปรับสไตล์เป็น Clean / White) #}
                 <div @click="openScheduleModal = true; mode = 'view'" 
-                     class="bg-linear-to-r from-indigo-500 to-purple-600 rounded-xl shadow-lg border border-indigo-400 p-6 text-white cursor-pointer hover:shadow-xl hover:scale-[1.02] transition transform group">
+                     class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 cursor-pointer hover:shadow-md hover:border-indigo-300 hover:scale-[1.02] transition-all duration-200 group">
                     
+                    {# Header #}
                     <div class="flex justify-between items-center mb-4">
-                        <div class="flex items-center gap-3">
-                            <div class="bg-white/20 p-3 rounded-full">
-                                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                        <div class="flex items-center gap-4">
+                            {# Icon: เปลี่ยนเป็นพื้นหลังจางๆ แทน #}
+                            <div class="bg-indigo-50 text-indigo-600 p-3 rounded-full group-hover:bg-indigo-100 transition-colors">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
                             </div>
                             <div>
-                                <h3 class="text-xl font-bold">ตารางเรียนของฉัน</h3>
-                                <p class="text-indigo-100 text-sm">แตะเพื่อดูภาพรวมรายสัปดาห์</p>
+                                <h3 class="text-lg font-bold text-gray-800 group-hover:text-indigo-600 transition-colors">ตารางเรียนของฉัน</h3>
+                                <p class="text-gray-500 text-sm">แตะเพื่อดูภาพรวมรายสัปดาห์</p>
                             </div>
                         </div>
-                        <div class="bg-white/20 p-2 rounded-lg group-hover:bg-white/30 transition">
+                        
+                        {# Arrow Icon #}
+                        <div class="text-gray-300 group-hover:text-indigo-500 transition-colors">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                         </div>
                     </div>
 
-                    {# Preview เล็กๆ (แสดง 2 วิชาวันนี้ ถ้ามี) #}
+                    {# Preview List (รายการวิชา) #}
                     <div class="space-y-2">
                         {% if my_schedules %}
                             {% for sched in my_schedules|slice:":2" %}
-                            <div class="bg-white/10 rounded px-3 py-2 flex justify-between items-center text-sm backdrop-blur-sm border border-white/10">
-                                <span class="font-medium truncate w-32">{{ sched.subject_name }}</span>
-                                <span class="text-xs opacity-80">{{ sched.get_day_display|slice:":3" }} • {{ sched.start_time|time:"H:i" }}</span>
+                            {# Item: ปรับเป็นพื้นสีเทาอ่อนๆ แทน #}
+                            <div class="bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 flex justify-between items-center text-sm group-hover:border-indigo-100 transition-colors">
+                                <div class="flex items-center gap-2 overflow-hidden">
+                                    <div class="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></div>
+                                    <span class="font-medium text-gray-700 truncate w-32">{{ sched.subject_name }}</span>
+                                </div>
+                                <span class="text-xs text-gray-400 font-medium">{{ sched.get_day_display|slice:":3" }} • {{ sched.start_time|time:"H:i" }}</span>
                             </div>
                             {% endfor %}
+                            
                             {% if my_schedules|length > 2 %}
-                                <div class="text-center text-xs opacity-70 mt-1">+ อีก {{ my_schedules|length|add:"-2" }} วิชา</div>
+                                <div class="text-center text-xs text-gray-400 mt-2 font-medium group-hover:text-indigo-500 transition-colors">+ อีก {{ my_schedules|length|add:"-2" }} วิชา</div>
                             {% endif %}
                         {% else %}
-                            <div class="text-center py-2 text-indigo-100 text-sm border border-dashed border-indigo-300/50 rounded">
+                            <div class="text-center py-4 text-gray-400 text-sm border-2 border-dashed border-gray-100 rounded-lg group-hover:border-indigo-100 transition-colors">
                                 ยังไม่มีตารางเรียน กดเพื่อเพิ่ม
                             </div>
                         {% endif %}
@@ -259,23 +267,23 @@
                         <div class="overflow-y-auto p-6 bg-gray-50 flex-1">
                             
                             {# --- MODE 1: VIEW TIMELINE (ตารางแนวนอน) --- #}
-                            {# 🟢 ปรับ UI ตรงนี้ให้สะอาดขึ้น (Clean Style) #}
                             <div x-show="mode === 'view'">
                                 <div class="bg-white p-4 rounded-xl shadow-md border border-gray-200 overflow-x-auto">
                                     <div class="min-w-[1000px]">
                                         <table class="w-full border-collapse border border-gray-200 text-sm">
                                             <thead>
                                                 <tr class="bg-gray-100 text-gray-700">
-                                                    <th class="border border-gray-200 p-3 w-20 font-bold">วัน/เวลา</th>
-                                                    <th class="border border-gray-200 p-3 w-[10%]">8:30</th>
-                                                    <th class="border border-gray-200 p-3 w-[10%]">9:30</th>
-                                                    <th class="border border-gray-200 p-3 w-[10%]">10:30</th>
-                                                    <th class="border border-gray-200 p-3 w-[10%]">11:30</th>
-                                                    <th class="border border-gray-200 p-3 w-[10%]">12:30</th>
-                                                    <th class="border border-gray-200 p-3 w-[10%]">13:30</th>
-                                                    <th class="border border-gray-200 p-3 w-[10%]">14:30</th>
-                                                    <th class="border border-gray-200 p-3 w-[10%]">15:30</th>
-                                                    <th class="border border-gray-200 p-3 w-[10%]">16:30</th>
+                                                    <th class="border border-gray-200 p-3 w-24 font-bold">วัน/เวลา</th>
+                                                    
+                                                    <th class="border border-gray-200 p-3 w-[11.11%]">8:30</th>
+                                                    <th class="border border-gray-200 p-3 w-[11.11%]">9:30</th>
+                                                    <th class="border border-gray-200 p-3 w-[11.11%]">10:30</th>
+                                                    <th class="border border-gray-200 p-3 w-[11.11%]">11:30</th>
+                                                    <th class="border border-gray-200 p-3 w-[11.11%]">12:30</th>
+                                                    <th class="border border-gray-200 p-3 w-[11.11%]">13:30</th>
+                                                    <th class="border border-gray-200 p-3 w-[11.11%]">14:30</th>
+                                                    <th class="border border-gray-200 p-3 w-[11.11%]">15:30</th>
+                                                    <th class="border border-gray-200 p-3 w-[11.11%]">16:30</th>
                                                 </tr>
                                             </thead>
 
@@ -284,23 +292,25 @@
                                                 <tr class="h-20 border-b border-gray-100 last:border-0">
                                                     <td class="bg-gray-50 text-gray-800 border-r border-gray-200 font-bold relative">
                                                         {{ day_name }}
-                                                        {# แถบสีเล็กๆ บอกวันหยุด #}
                                                         {% if day_code == 'Sat' or day_code == 'Sun' %}
                                                             <div class="absolute left-0 top-0 bottom-0 w-1 bg-red-400"></div>
                                                         {% else %}
                                                             <div class="absolute left-0 top-0 bottom-0 w-1 bg-indigo-400"></div>
                                                         {% endif %}
                                                     </td>
-                                                    <td colspan="10" class="p-0 relative h-20 align-top">
-                                                        {# เส้นแบ่ง Grid จางๆ #}
-                                                        <div class="grid grid-cols-10 h-full absolute inset-0 pointer-events-none">
-                                                            {% for i in "1234567890"|make_list %}<div class="border-r border-gray-100 h-full"></div>{% endfor %}
+                                                    
+                                                    {#  แก้ colspan เป็น 9 และ grid-cols-9 ให้ตรงกับ Header #}
+                                                    <td colspan="9" class="p-0 relative h-20 align-top">
+                                                        <div class="grid grid-cols-9 h-full absolute inset-0 pointer-events-none">
+                                                            {% for i in "123456789"|make_list %}
+                                                                <div class="border-r border-gray-100 h-full"></div>
+                                                            {% endfor %}
                                                         </div>
 
-                                                        {# แสดงวิชา (Style: Modern Clean) #}
                                                         {% for sched in my_schedules %}
                                                             {% if sched.day == day_code %}
-                                                                <div class="absolute top-1 bottom-1 mx-0.5 rounded-lg px-2 py-1 shadow-sm cursor-pointer group flex flex-col justify-center transition-all z-10 hover:z-20 hover:scale-[1.02] bg-indigo-50 border border-indigo-200 text-indigo-800 hover:bg-indigo-100"
+                                                                {# การ์ดวิชา (เพิ่ม overflow-hidden เพื่อตัดส่วนเกินถ้ามี) #}
+                                                                <div class="absolute top-1 bottom-1 mx-0.5 rounded-lg px-2 py-1 shadow-sm cursor-pointer group flex flex-col justify-center transition-all z-10 hover:z-20 hover:scale-[1.02] bg-indigo-50 border border-indigo-200 text-indigo-800 hover:bg-indigo-100 overflow-hidden"
                                                                      style="left: {{ sched.style_left }}%; width: {{ sched.style_width }}%;">
                                                                     
                                                                     <div class="font-bold truncate text-xs sm:text-sm">{{ sched.subject_name }}</div>

@@ -1,202 +1,177 @@
-{# board/templates/boards/reporting.html #}
 {% extends "base.html" %}
 
 {% block content %}
-<div class="min-h-screen bg-gray-50 p-6 sm:p-8" x-data="reportApp()">
+<div class="min-h-screen bg-gray-50/50 p-6 sm:p-8 font-sans" x-data="reportApp()">
 
-    {# --- HEADER & FILTER --- #}
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+    {# --- HEADER SECTION --- #}
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
         <div>
-            <h1 class="text-2xl font-bold text-gray-800">รายงานผล (Reporting)</h1>
-            <p class="text-sm text-gray-500 mt-1">
-                สรุปสถิติจาก: <span class="font-semibold text-indigo-600">{{ current_board_name }}</span>
+            <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight">รายงานผลการดำเนินงาน</h1>
+            <p class="text-sm text-gray-500 mt-2 flex items-center gap-2">
+                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                สรุปสถิติจาก: <span class="font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">{{ current_board_name }}</span>
             </p>
         </div>
 
-        {# Dropdown Filter #}
-        <div class="relative">
+        {# Filter Dropdown #}
+        <div class="relative group">
             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+                <svg class="h-5 w-5 text-gray-400 group-hover:text-indigo-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
             </div>
-            <select onchange="window.location.href='?board_id=' + this.value" class="pl-10 pr-10 py-2.5 text-sm font-medium bg-white border border-gray-200 text-gray-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm cursor-pointer hover:border-indigo-300 transition-colors w-full sm:w-auto min-w-[200px]">
-                <option value="all" {% if not selected_board_id or selected_board_id == 'all' %}selected{% endif %}>แสดงทุกโปรเจกต์</option>
+            <select onchange="window.location.href='?board_id=' + this.value" class="pl-10 pr-10 py-2.5 text-sm font-medium bg-white border border-gray-200 text-gray-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm cursor-pointer hover:border-indigo-300 transition-all w-full md:w-64 appearance-none">
+                <option value="all" {% if not selected_board_id or selected_board_id == 'all' %}selected{% endif %}> แสดงทุกโปรเจกต์</option>
                 {% for board in boards %}
-                <option value="{{ board.id }}" {% if selected_board_id|stringformat:"s" == board.id|stringformat:"s" %}selected{% endif %}>{{ board.name }}</option>
+                <option value="{{ board.id }}" {% if selected_board_id|stringformat:"s" == board.id|stringformat:"s" %}selected{% endif %}> {{ board.name }}</option>
                 {% endfor %}
             </select>
+            <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            </div>
         </div>
     </div>
 
-    {# --- KPI CARDS (Clickable) --- #}
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    {# --- KPI CARDS --- #}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 mb-8">
         
-        {# Card 1: งานทั้งหมด #}
-        <div @click="openModal('all', 'งานทั้งหมด')" class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4 cursor-pointer hover:shadow-md hover:border-blue-200 transition-all group">
-            <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+        {# 1. งานทั้งหมด #}
+        <div @click="openModal('all', 'งานทั้งหมด')" class="bg-white p-5 rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-gray-100 flex items-center gap-4 cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
+            <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors duration-300">
+                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
             </div>
             <div>
-                <p class="text-xs text-gray-400 font-medium uppercase tracking-wider group-hover:text-blue-500">งานทั้งหมด</p>
-                <h3 class="text-2xl font-bold text-gray-800">{{ total_tasks }}</h3>
+                <p class="text-xs text-gray-400 font-bold uppercase tracking-wider mb-1">งานทั้งหมด</p>
+                <h3 class="text-2xl font-extrabold text-gray-800 group-hover:text-blue-600 transition-colors">{{ total_tasks }}</h3>
             </div>
         </div>
 
-        {# Card 2: ทำเสร็จแล้ว #}
-        <div @click="openModal('completed', 'งานที่ทำเสร็จแล้ว')" class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4 cursor-pointer hover:shadow-md hover:border-green-200 transition-all group">
-            <div class="w-12 h-12 rounded-xl bg-green-50 text-green-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        {# 2. งานที่เหลือ #}
+        <div @click="openModal('remaining', 'งานที่เหลือ (คงค้าง)')" class="bg-white p-5 rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-gray-100 flex items-center gap-4 cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
+            <div class="w-12 h-12 rounded-xl bg-orange-50 text-orange-500 flex items-center justify-center group-hover:bg-orange-500 group-hover:text-white transition-colors duration-300">
+                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             </div>
             <div>
-                <p class="text-xs text-gray-400 font-medium uppercase tracking-wider group-hover:text-green-500">ทำเสร็จแล้ว</p>
-                <h3 class="text-2xl font-bold text-gray-800">{{ completed_tasks }}</h3>
+                <p class="text-xs text-gray-400 font-bold uppercase tracking-wider mb-1">คงเหลือ</p>
+                <h3 class="text-2xl font-extrabold text-gray-800 group-hover:text-orange-500 transition-colors">{{ remaining_count }}</h3>
             </div>
         </div>
 
-        {# Card 3: อัตราความสำเร็จ (อันนี้ไม่มี List ให้กด) #}
-        <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
-            <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+        {# 3. ทำเสร็จแล้ว #}
+        <div @click="openModal('completed', 'งานที่ทำเสร็จแล้ว')" class="bg-white p-5 rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-gray-100 flex items-center gap-4 cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
+            <div class="w-12 h-12 rounded-xl bg-green-50 text-green-600 flex items-center justify-center group-hover:bg-green-600 group-hover:text-white transition-colors duration-300">
+                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             </div>
             <div>
-                <p class="text-xs text-gray-400 font-medium uppercase tracking-wider">ความคืบหน้า</p>
-                <h3 class="text-2xl font-bold text-gray-800">{{ completion_rate }}%</h3>
+                <p class="text-xs text-gray-400 font-bold uppercase tracking-wider mb-1">เสร็จสิ้น</p>
+                <h3 class="text-2xl font-extrabold text-gray-800 group-hover:text-green-600 transition-colors">{{ completed_tasks }}</h3>
             </div>
         </div>
 
-        {# Card 4: เกินกำหนด #}
-        <div @click="openModal('overdue', 'งานล่าช้า (เกินกำหนด)')" class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4 cursor-pointer hover:shadow-md hover:border-red-200 transition-all group">
-            <div class="w-12 h-12 rounded-xl bg-red-50 text-red-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        {# 4. อัตราความสำเร็จ #}
+        <div class="bg-white p-5 rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-gray-100 flex items-center gap-4 hover:shadow-lg transition-all duration-300 group">
+            <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
+                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
             </div>
             <div>
-                <p class="text-xs text-gray-400 font-medium uppercase tracking-wider group-hover:text-red-500">งานล่าช้า</p>
-                <h3 class="text-2xl font-bold text-gray-800">{{ overdue_tasks }}</h3>
+                <p class="text-xs text-gray-400 font-bold uppercase tracking-wider mb-1">ความคืบหน้า</p>
+                <h3 class="text-2xl font-extrabold text-gray-800 group-hover:text-indigo-600 transition-colors">{{ completion_rate }}%</h3>
+            </div>
+        </div>
+
+        {# 5. เกินกำหนด #}
+        <div @click="openModal('overdue', 'งานล่าช้า (เกินกำหนด)')" class="bg-white p-5 rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-gray-100 flex items-center gap-4 cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
+            <div class="w-12 h-12 rounded-xl bg-red-50 text-red-600 flex items-center justify-center group-hover:bg-red-600 group-hover:text-white transition-colors duration-300">
+                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+            </div>
+            <div>
+                <p class="text-xs text-gray-400 font-bold uppercase tracking-wider mb-1">ล่าช้า</p>
+                <h3 class="text-2xl font-extrabold text-gray-800 group-hover:text-red-600 transition-colors">{{ overdue_tasks }}</h3>
             </div>
         </div>
     </div>
 
-    {# --- CHARTS SECTION (เหมือนเดิม) --- #}
+    {# --- CHARTS SECTION: Team & Workflow --- #}
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 lg:col-span-1">
-            <h3 class="text-lg font-bold text-gray-800 mb-6">งานคงค้างแยกตามความสำคัญ</h3>
-            <div id="priorityChart" class="flex justify-center"></div>
-            <div class="flex justify-center gap-4 mt-6 text-sm">
-                <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-red-500"></span> High</div>
-                <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-blue-500"></span> Medium</div>
-                <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-green-500"></span> Low</div>
+        
+        {# Chart 1: Priority (33%) #}
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 lg:col-span-1 flex flex-col justify-between hover:shadow-md transition-shadow duration-300">
+            <div>
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-lg font-bold text-gray-800">ลำดับความสำคัญ</h3>
+                    <span class="bg-gray-100 text-gray-500 text-xs px-2 py-1 rounded-full font-medium">งานคงค้าง</span>
+                </div>
+                <div id="priorityChart" class="flex justify-center py-2"></div>
             </div>
+            <p class="text-xs text-gray-400 text-center mt-4">*แสดงเฉพาะงานที่ยังไม่เสร็จ</p>
         </div>
-        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 lg:col-span-2">
-            <h3 class="text-lg font-bold text-gray-800 mb-6">งานที่ทำเสร็จ (7 วันล่าสุด)</h3>
-            <div id="trendChart"></div>
+
+        {# Chart 2: Member Workload (33%) #}
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 lg:col-span-1 hover:shadow-md transition-shadow duration-300">
+            <div class="mb-6">
+                <h3 class="text-lg font-bold text-gray-800">ภาระงานของทีม</h3>
+                <p class="text-sm text-gray-500 mt-1">จำนวนงานที่แต่ละคนรับผิดชอบอยู่</p>
+            </div>
+            <div id="memberChart"></div>
         </div>
+
+        {# Chart 3: Distribution (33%) #}
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 lg:col-span-1 hover:shadow-md transition-shadow duration-300">
+            <div class="mb-6">
+                <h3 class="text-lg font-bold text-gray-800">สถานะงานปัจจุบัน</h3>
+                <p class="text-sm text-gray-500 mt-1">ภาพรวมการกระจายตัวของงาน</p>
+            </div>
+            <div id="listChart"></div>
+        </div>
+
     </div>
 
-    {# --- DETAIL MODAL (Pop-up) --- #}
+    {# --- DETAIL MODAL (เหมือนเดิม) --- #}
     <div x-show="modalOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
-        {# Backdrop #}
-        <div x-show="modalOpen" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm" @click="closeModal()"></div>
-
-        {# Panel #}
-        <div x-show="modalOpen" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95" class="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden">
-            
-            {# Header #}
-            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0 bg-white">
-                <h3 class="text-lg font-bold text-gray-800" x-text="modalTitle"></h3>
-                <button @click="closeModal()" class="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100"><svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
+        <div x-show="modalOpen" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm" @click="closeModal()"></div>
+        <div x-show="modalOpen" class="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden ring-1 ring-black/5">
+            <div class="px-6 py-5 border-b border-gray-100 flex items-center justify-between shrink-0 bg-white">
+                <div><h3 class="text-xl font-bold text-gray-800" x-text="modalTitle"></h3><p class="text-xs text-gray-500 mt-1">รายละเอียดรายการงาน</p></div>
+                <button @click="closeModal()" class="text-gray-400 hover:text-gray-600 bg-gray-100 hover:bg-gray-200 p-2 rounded-full transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
-
-            {# List Body #}
-            <div class="flex-1 overflow-y-auto p-0">
-                <table class="w-full text-left text-sm">
-                    <thead class="bg-gray-50 text-gray-500 font-medium border-b border-gray-100 sticky top-0">
-                        <tr>
-                            <th class="px-6 py-3">ชื่องาน</th>
-                            <th class="px-6 py-3">Project / Board</th>
-                            <th class="px-6 py-3">List</th>
-                            <th class="px-6 py-3 text-right">Action</th>
-                        </tr>
+            <div class="flex-1 overflow-y-auto bg-gray-50/50">
+                <table class="w-full text-left text-sm border-collapse">
+                    <thead class="bg-gray-50 text-gray-500 font-medium border-b border-gray-200 sticky top-0 shadow-sm">
+                        <tr><th class="px-6 py-4 font-semibold">ชื่องาน</th><th class="px-6 py-4 font-semibold">Project</th><th class="px-6 py-4 font-semibold">List Status</th><th class="px-6 py-4 font-semibold text-right">Action</th></tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-100">
+                    <tbody class="divide-y divide-gray-100 bg-white">
                         <template x-for="task in activeTasks" :key="task.id">
-                            <tr class="hover:bg-gray-50 transition-colors">
-                                <td class="px-6 py-3">
-                                    <div class="font-medium text-gray-800" x-text="task.title"></div>
-                                    <div class="text-xs text-gray-400 mt-0.5" x-text="task.due_date ? 'กำหนดส่ง: ' + task.due_date : ''"></div>
+                            <tr class="hover:bg-gray-50/80 transition-colors group">
+                                <td class="px-6 py-4 align-top">
+                                    <div class="font-semibold text-gray-800 text-base" x-text="task.title"></div>
+                                    <div class="flex items-center gap-1.5 mt-1.5" x-show="task.due_date"><svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg><span class="text-xs text-gray-500" x-text="task.due_date"></span></div>
                                 </td>
-                                <td class="px-6 py-3">
-                                    <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-indigo-50 text-indigo-700" x-text="task.board_name"></span>
-                                </td>
-                                <td class="px-6 py-3 text-gray-500" x-text="task.list_title"></td>
-                                <td class="px-6 py-3 text-right">
-                                    <a :href="task.url" target="_blank" class="text-indigo-600 hover:text-indigo-800 hover:underline text-xs font-bold">ไปที่บอร์ด &rarr;</a>
-                                </td>
+                                <td class="px-6 py-4 align-top"><span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200" x-text="task.board_name"></span></td>
+                                <td class="px-6 py-4 align-top"><span class="text-gray-600 font-medium" x-text="task.list_title"></span></td>
+                                <td class="px-6 py-4 align-top text-right"><a :href="task.url" target="_blank" class="inline-flex items-center justify-center px-3 py-1.5 border border-indigo-200 text-indigo-600 hover:bg-indigo-50 hover:border-indigo-300 rounded-lg text-xs font-semibold transition-all shadow-sm">ดูงาน <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></a></td>
                             </tr>
                         </template>
-                        <tr x-show="activeTasks.length === 0">
-                            <td colspan="4" class="px-6 py-8 text-center text-gray-400">ไม่มีข้อมูลในหมวดหมู่นี้</td>
-                        </tr>
+                        <tr x-show="activeTasks.length === 0"><td colspan="4" class="px-6 py-12 text-center"><div class="flex flex-col items-center justify-center text-gray-400"><svg class="w-12 h-12 mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg><p class="text-sm font-medium">ไม่พบข้อมูลในหมวดหมู่นี้</p></div></td></tr>
                     </tbody>
                 </table>
             </div>
-
-            {# Footer #}
-            <div class="px-6 py-3 bg-gray-50 border-t border-gray-100 text-right shrink-0">
-                <button @click="closeModal()" class="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 shadow-sm">ปิดหน้าต่าง</button>
-            </div>
+            <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 text-right shrink-0"><button @click="closeModal()" class="px-5 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 hover:text-gray-900 shadow-sm transition-all focus:ring-2 focus:ring-offset-2 focus:ring-gray-200">ปิดหน้าต่าง</button></div>
         </div>
     </div>
 
 </div>
 
-{# --- Scripts --- #}
 <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 <script>
-    // 1. Data Logic (Alpine)
     function reportApp() {
         return {
             modalOpen: false,
             modalTitle: '',
             activeTasks: [],
             
-            // ข้อมูลดิบจาก Django (แปลงเป็น JSON Object)
             data: {
-                all: [
-                    {% for t in all_tasks_qs %}
-                    {
-                        id: {{ t.id }},
-                        title: '{{ t.title|escapejs }}',
-                        board_name: '{{ t.list.board.name|escapejs }}',
-                        list_title: '{{ t.list.title|escapejs }}',
-                        due_date: '{{ t.due_date|date:"d M Y"|default:"" }}',
-                        url: '{% url "board_detail" t.list.board.id %}?task_id={{ t.id }}'
-                    },
-                    {% endfor %}
-                ],
-                completed: [
-                    {% for t in completed_tasks_qs %}
-                    {
-                        id: {{ t.id }},
-                        title: '{{ t.title|escapejs }}',
-                        board_name: '{{ t.list.board.name|escapejs }}',
-                        list_title: '{{ t.list.title|escapejs }}',
-                        due_date: '{{ t.due_date|date:"d M Y"|default:"" }}',
-                        url: '{% url "board_detail" t.list.board.id %}?task_id={{ t.id }}'
-                    },
-                    {% endfor %}
-                ],
-                overdue: [
-                    {% for t in overdue_tasks_qs %}
-                    {
-                        id: {{ t.id }},
-                        title: '{{ t.title|escapejs }}',
-                        board_name: '{{ t.list.board.name|escapejs }}',
-                        list_title: '{{ t.list.title|escapejs }}',
-                        due_date: '{{ t.due_date|date:"d M Y"|default:"" }}',
-                        url: '{% url "board_detail" t.list.board.id %}?task_id={{ t.id }}'
-                    },
-                    {% endfor %}
-                ]
+                all: [ {% for t in all_tasks_qs %} { id: {{ t.id }}, title: '{{ t.title|escapejs }}', board_name: '{{ t.list.board.name|escapejs }}', list_title: '{{ t.list.title|escapejs }}', due_date: '{{ t.due_date|date:"d M Y"|default:"" }}', url: '{% url "board_detail" t.list.board.id %}?task_id={{ t.id }}' }, {% endfor %} ],
+                remaining: [ {% for t in remaining_tasks_qs %} { id: {{ t.id }}, title: '{{ t.title|escapejs }}', board_name: '{{ t.list.board.name|escapejs }}', list_title: '{{ t.list.title|escapejs }}', due_date: '{{ t.due_date|date:"d M Y"|default:"" }}', url: '{% url "board_detail" t.list.board.id %}?task_id={{ t.id }}' }, {% endfor %} ],
+                completed: [ {% for t in completed_tasks_qs %} { id: {{ t.id }}, title: '{{ t.title|escapejs }}', board_name: '{{ t.list.board.name|escapejs }}', list_title: '{{ t.list.title|escapejs }}', due_date: '{{ t.due_date|date:"d M Y"|default:"" }}', url: '{% url "board_detail" t.list.board.id %}?task_id={{ t.id }}' }, {% endfor %} ],
+                overdue: [ {% for t in overdue_tasks_qs %} { id: {{ t.id }}, title: '{{ t.title|escapejs }}', board_name: '{{ t.list.board.name|escapejs }}', list_title: '{{ t.list.title|escapejs }}', due_date: '{{ t.due_date|date:"d M Y"|default:"" }}', url: '{% url "board_detail" t.list.board.id %}?task_id={{ t.id }}' }, {% endfor %} ]
             },
 
             openModal(type, title) {
@@ -210,31 +185,83 @@
         }
     }
 
-    // 2. Charts Logic
     document.addEventListener('DOMContentLoaded', function () {
-        // Priority Chart
+        const commonOptions = { fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, sans-serif', toolbar: { show: false } };
+
+        // 1. Priority Chart
         var priorityOptions = {
+            ...commonOptions,
             series: [{{ priority_data.high }}, {{ priority_data.medium }}, {{ priority_data.low }}],
-            chart: { type: 'donut', height: 280, fontFamily: 'Inter, sans-serif' },
+            chart: { type: 'donut', height: 260 },
             labels: ['High', 'Medium', 'Low'],
             colors: ['#EF4444', '#3B82F6', '#10B981'],
-            plotOptions: { pie: { donut: { size: '70%', labels: { show: true, total: { show: true, label: 'คงเหลือ', color: '#6B7280', formatter: function (w) { return w.globals.seriesTotals.reduce((a, b) => a + b, 0) } } } } } },
-            dataLabels: { enabled: false }, legend: { show: false }, stroke: { show: false }
+            plotOptions: { 
+                pie: { 
+                    donut: { 
+                        size: '75%', 
+                        labels: { 
+                            show: true, 
+                            name: { show: true, fontSize: '12px', fontFamily: 'Inter', color: '#6B7280', offsetY: -5 },
+                            value: { show: true, fontSize: '24px', fontFamily: 'Inter', fontWeight: 800, color: '#111827', offsetY: 5 },
+                            total: { show: true, label: 'งานคงค้าง', color: '#6B7280', fontSize: '12px', fontWeight: 500 } 
+                        } 
+                    } 
+                } 
+            },
+            dataLabels: { enabled: false },
+            legend: { position: 'bottom', fontSize: '13px', markers: { radius: 12 } },
+            stroke: { show: true, colors: ['#fff'], width: 2 }
         };
         new ApexCharts(document.querySelector("#priorityChart"), priorityOptions).render();
 
-        // Trend Chart
-        var trendOptions = {
-            series: [{ name: 'งานที่เสร็จ', data: {{ trend_data|safe }} }],
-            chart: { type: 'area', height: 300, toolbar: { show: false }, fontFamily: 'Inter, sans-serif' },
-            colors: ['#4F46E5'],
-            fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.7, opacityTo: 0.2, stops: [0, 90, 100] } },
-            dataLabels: { enabled: false }, stroke: { curve: 'smooth', width: 3 },
-            xaxis: { categories: {{ trend_labels|safe }}, axisBorder: { show: false }, axisTicks: { show: false } },
-            yaxis: { show: true, tickAmount: 3, labels: { formatter: function(val) { return val.toFixed(0) } } },
-            grid: { borderColor: '#F3F4F6', strokeDashArray: 4 }
-        };
-        new ApexCharts(document.querySelector("#trendChart"), trendOptions).render();
+        // 2. Member Workload Chart
+        var memberData = {{ member_data|default:"[]"|safe }};
+        var memberLabels = {{ member_labels|default:"[]"|safe }};
+
+        if (memberData.length > 0) {
+            var memberOptions = {
+                ...commonOptions,
+                series: [{ name: 'จำนวนงาน', data: memberData }],
+                chart: { type: 'bar', height: 320, toolbar: { show: false } },
+                plotOptions: { bar: { borderRadius: 6, horizontal: false, columnWidth: '45%', distributed: true } },
+                dataLabels: { enabled: false },
+                xaxis: { 
+                    categories: memberLabels, 
+                    labels: { style: { fontSize: '12px', colors: '#6B7280' } },
+                    axisBorder: { show: false },
+                    axisTicks: { show: false }
+                },
+                yaxis: { labels: { style: { colors: '#9CA3AF' }, formatter: (val) => val.toFixed(0) } },
+                colors: ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#eab308'],
+                legend: { show: false },
+                grid: { show: true, borderColor: '#f3f4f6', strokeDashArray: 4 }
+            };
+            new ApexCharts(document.querySelector("#memberChart"), memberOptions).render();
+        } else {
+            document.querySelector("#memberChart").innerHTML = "<div class='flex flex-col items-center justify-center h-64 text-gray-400'><svg class='w-12 h-12 mb-2 text-gray-300' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z'></path></svg><p class='text-sm'>ไม่มีข้อมูลสมาชิก</p></div>";
+        }
+
+        // 3. Task Distribution Chart
+        var listData = {{ list_data|default:"[]"|safe }};
+        var listLabels = {{ list_labels|default:"[]"|safe }};
+
+        if (listData.length > 0) {
+            var listOptions = {
+                ...commonOptions,
+                series: [{ name: 'จำนวนงาน', data: listData }],
+                chart: { type: 'bar', height: 320, toolbar: { show: false } },
+                plotOptions: { bar: { borderRadius: 4, horizontal: true, barHeight: '40%', distributed: true } },
+                dataLabels: { enabled: true, textAnchor: 'start', style: { colors: ['#fff'] }, offsetX: 0, dropShadow: { enabled: false } },
+                xaxis: { categories: listLabels, labels: { style: { colors: '#9CA3AF' } } },
+                yaxis: { labels: { style: { fontSize: '13px', fontWeight: 500, colors: '#4B5563' } } },
+                colors: ['#3B82F6', '#10B981', '#F59E0B', '#EF4444'],
+                legend: { show: false },
+                grid: { show: false }
+            };
+            new ApexCharts(document.querySelector("#listChart"), listOptions).render();
+        } else {
+            document.querySelector("#listChart").innerHTML = "<div class='flex flex-col items-center justify-center h-64 text-gray-400'><svg class='w-12 h-12 mb-2 text-gray-300' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2'></path></svg><p class='text-sm'>ไม่มีข้อมูลสถานะงาน</p></div>";
+        }
     });
 </script>
 {% endblock %}
