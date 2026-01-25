@@ -13,22 +13,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="X-UA-Compatible" content="ie=edge" />
     
-    {# ไฟล์ JS หลักของเรา #}
-    <script defer src="{% static 'js/main.js' %}?v=13"></script>
+   
+    <script defer src="{% static 'js/main.js' %}?v=14"></script>
 
-    {# ✅ เรียกไฟล์ alpine.js ตรงๆ แบบนี้ ชัวร์กว่าครับ #}
+    
     <script src="{% static 'js/alpine.js' %}" defer></script>
     
     {% tailwind_css %}
-  </head>
+</head>
  <body class="bg-gray-100 min-h-screen">
-    {# ✅ เพิ่ม block main_container_classes รอบ div ที่มี pt-14 #}
     {% block main_container_classes %}
     <div class="flex flex-col min-h-screen pt-14"> 
     {% endblock %}   
-        {# โค้ดส่วน navbar/sidebar/main ที่เหลือเหมือนเดิม #}
         {% block layout %}
-        
             {% block navbar %} 
                 {% include "components/navbar.html" %} 
             {% endblock %}
@@ -45,6 +42,6 @@
 
         {% endblock %}
     </div>
+    
 </body>
-</html>
 </html>

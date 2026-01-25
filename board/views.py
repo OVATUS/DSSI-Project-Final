@@ -635,7 +635,6 @@ def add_member(request, board_id):
     try:
         user_to_invite = User.objects.get(username=username)
         
-        .
         if user_to_invite in board.members.all() or user_to_invite == board.created_by:
             pass
         else:

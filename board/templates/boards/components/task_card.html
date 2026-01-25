@@ -143,16 +143,14 @@
                 class="text-gray-300 hover:text-red-500 p-1 rounded-md hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
                 title="เก็บถาวร (Archive)"
                 @click.stop="
-                    if(confirm('ยืนยันเก็บถาวรงานนี้?')) {
-                        fetch('{% url "toggle_task_archive" task.id %}', {
-                            method: 'POST',
-                            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
-                        })
-                        .then(res => {
-                            if(res.ok) window.location.reload();
-                            else alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
-                        });
-                    }
+                    fetch('{% url 'toggle_task_archive' task.id %}', {
+                        method: 'POST',
+                        headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+                    })
+                    .then(res => {
+                        if(res.ok) window.location.reload();
+                        else alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+                    });
                 "
             >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

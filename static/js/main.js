@@ -126,13 +126,10 @@ window.boardDetailPage = function (config) {
 
         // ✅ 3. ฟังก์ชันกู้คืนงาน (ใช้ API ตัวเดิมที่มีอยู่แล้วได้เลย)
         async restoreTask(taskId, csrfToken) {
-            if(!confirm('ต้องการกู้คืนงานนี้กลับไปที่บอร์ด?')) return;
             
-            // เรียกใช้ฟังก์ชัน toggleArchive ตัวเดิม (เพราะมันสลับ True <-> False ให้อยู่แล้ว)
+           
             await this.toggleArchive(taskId, csrfToken);
             
-            // หมายเหตุ: toggleArchive เดิมของเราสั่ง reload หน้าเว็บอยู่แล้ว 
-            // ดังนั้นพอกู้คืนเสร็จ หน้าเว็บจะรีเฟรชและงานจะกลับมาเองครับ
         },
         // ------------------------------------------------------------------
         // ✅ Section 1: Comment Logic
