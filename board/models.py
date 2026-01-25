@@ -97,13 +97,7 @@ class Task(models.Model):
     description = models.TextField(blank=True, null=True)
     position = models.IntegerField(default=0)
     is_archived = models.BooleanField(default=False) 
-    assigned_to = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="tasks_assigned"
-    )
+    assigned_to = models.ManyToManyField(User, related_name='tasks', blank=True)
 
     due_date = models.DateTimeField(null=True, blank=True)
 

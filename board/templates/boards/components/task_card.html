@@ -8,7 +8,7 @@
   x-show="
       true 
       && (searchQuery === '' || '{{ task.title|escapejs }}'.toLowerCase().includes(searchQuery.toLowerCase()))
-      && (filterMember === '' || '{{ task.assigned_to.id|default:'' }}' === filterMember)
+      && (filterMember === '' || [{% for u in task.assigned_to.all %}'{{ u.id }}',{% endfor %}].includes(filterMember))
       && (filterLabel === '' || [{% for l in task.labels.all %}{{ l.id }},{% endfor %}].includes(parseInt(filterLabel)))
   "
   x-transition:enter="transition ease-out duration-200"
@@ -24,7 +24,7 @@
     taskActionUrl = '{% url 'task_update' task.id %}';
     taskTitle = '{{ task.title|escapejs }}';
     taskDescription = '{{ task.description|default_if_none:''|escapejs }}';
-    taskAssignedTo = '{{ task.assigned_to_id|default:'' }}';
+    taskAssignedTo = [{% for u in task.assigned_to.all %}{{ u.id }},{% endfor %}];
     taskPriority = '{{ task.priority }}';
     taskDueDate = '{{ task.due_date|default_if_none:''|date:'Y-m-d\\TH:i' }}';
     taskIsArchived = {% if task.is_archived %}true{% else %}false{% endif %};
@@ -159,15 +159,26 @@
             </button>
 
             {# User Avatar #}
-            {% if task.assigned_to %}
-                {% if task.assigned_to.profile_image %}
-                    <img src="{{ task.assigned_to.profile_image.url }}" class="w-6 h-6 rounded-full object-cover border-2 border-white shadow-sm hover:scale-110 transition-transform" title="รับผิดชอบโดย: {{ task.assigned_to.username }}">
-                {% else %}
-                    <div class="w-6 h-6 rounded-full bg-linear-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center text-[9px] font-bold border-2 border-white shadow-sm hover:scale-110 transition-transform" title="รับผิดชอบโดย: {{ task.assigned_to.username }}">
-                        {{ task.assigned_to.username.0|upper }}
+            <div class="flex -space-x-1.5 overflow-hidden ml-1">
+                {% for user in task.assigned_to.all|slice:":3" %}
+                    <div class="relative z-0 hover:z-10 transition-all hover:scale-110" title="รับผิดชอบโดย: {{ user.username }}">
+                        {% if user.profile_image %}
+                            <img src="{{ user.profile_image.url }}" class="w-6 h-6 rounded-full object-cover border-2 border-white shadow-sm">
+                        {% else %}
+                            <div class="w-6 h-6 rounded-full bg-linear-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center text-[9px] font-bold border-2 border-white shadow-sm">
+                                {{ user.username.0|upper }}
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+
+                {# ถ้ามีมากกว่า 3 คน ให้แสดง +จำนวน #}
+                {% if task.assigned_to.count > 3 %}
+                    <div class="w-6 h-6 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center text-[9px] font-bold border-2 border-white shadow-sm z-0">
+                        +{{ task.assigned_to.count|add:"-3" }}
                     </div>
                 {% endif %}
-            {% endif %}
+            </div>
         </div>
     </div>
 </div>

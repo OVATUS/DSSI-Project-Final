@@ -106,9 +106,9 @@ def board_detail(request, board_id):
         id=board_id
     )
     # ... (code ส่วนดึง lists, tasks เหมือนเดิม)
-    lists = board.lists.all().prefetch_related(
-        Prefetch('tasks', queryset=Task.objects.filter(is_archived=False).order_by('position').select_related('assigned_to').prefetch_related('labels'))
-        ).order_by('position')
+    lists = List.objects.filter(board=board).order_by('position').prefetch_related(
+        Prefetch('tasks', queryset=Task.objects.prefetch_related('assigned_to', 'labels').select_related('list').order_by('position'))
+    )
 
     users = User.objects.filter(
         Q(id=board.created_by.id) | Q(joined_boards=board)
@@ -259,7 +259,7 @@ from django.db.models import Q  # อย่าลืม import Q ด้านบ
 
 @login_required
 def task_create(request, list_id):
-    # ✅ เช็คสิทธิ์ (Owner หรือ Member)
+    # 1. ดึง List และเช็คสิทธิ์
     list_obj = get_object_or_404(
         List.objects.filter(
             Q(board__created_by=request.user) | Q(board__members=request.user)
@@ -270,69 +270,75 @@ def task_create(request, list_id):
     if request.method == "POST":
         form = TaskForm(request.POST)
         if form.is_valid():
+            # 2. บันทึก Task เบื้องต้น (ยังไม่ใส่ Many-to-Many)
             task = form.save(commit=False)
             task.created_by = request.user
             task.list = list_obj
-            task.save()
+            task.save() 
             
-            # บันทึก Activity Log
-            log_activity(list_obj.board, request.user, f"สร้างการ์ด '{task.title}' ในรายการ '{list_obj.title}'")
-            
-            # จัดการ Labels
+            # 3. จัดการ Labels (Many-to-Many)
             label_ids = request.POST.getlist('labels')
             if label_ids:
                 task.labels.set(label_ids)
+
+            # 4. จัดการ Assignees (Many-to-Many) ✅ [ส่วนที่แก้]
+            assignee_ids = request.POST.getlist('assigned_to') # รับเป็น list หลายคน
+            if assignee_ids:
+                users_to_assign = User.objects.filter(id__in=assignee_ids)
+                task.assigned_to.set(users_to_assign) # บันทึกหลายคน
+
+            # บันทึก Log
+            log_activity(list_obj.board, request.user, f"สร้างการ์ด '{task.title}' ในรายการ '{list_obj.title}'")
             
-            # import threading ตรงนี้ครั้งเดียว เพื่อใช้ทั้ง Email และ Discord
-            import threading 
+            import threading
 
             # ==================================================
-            #  ส่วนแจ้งเตือนการมอบหมายงาน (Internal + Email)
+            # 5. แจ้งเตือน Notification & Email (วนลูปแจ้งทุกคน) ✅
             # ==================================================
-            if task.assigned_to and task.assigned_to != request.user:
-                # 1. แจ้งเตือนในระบบ (กระดิ่งบนเว็บ)
-                Notification.objects.create(
-                    recipient=task.assigned_to,
-                    actor=request.user,
-                    task=task,
-                    message=f"ได้มอบหมายงานใหม่ '{task.title}' ให้คุณ"
-                )
-
-                # 2. แจ้งเตือนผ่าน Email (ใช้ Thread เพื่อความลื่นไหล)
-                try:
-                    threading.Thread(
-                        target=send_email_notify, 
-                        args=(task, task.assigned_to)
-                    ).start()
-                except Exception as e:
-                    print(f"Email Thread Error: {e}")
+            assigned_users = task.assigned_to.all()
+            for user in assigned_users:
+                if user != request.user:
+                    # แจ้งเตือนในเว็บ
+                    Notification.objects.create(
+                        recipient=user,
+                        actor=request.user,
+                        task=task,
+                        message=f"ได้มอบหมายงานใหม่ '{task.title}' ให้คุณ"
+                    )
+                    # แจ้งเตือนทางอีเมล
+                    try:
+                        threading.Thread(
+                            target=send_email_notify, 
+                            args=(task, user)
+                        ).start()
+                    except Exception as e:
+                        print(f"Email Thread Error: {e}")
 
             # ==================================================
-            # 🎮 ส่วนแจ้งเตือน DISCORD (เฉพาะบอร์ดที่ตั้งค่าไว้)
+            # 6. แจ้งเตือน DISCORD (โชว์ชื่อทุกคน) ✅
             # ==================================================
             try:
-                # ดึง URL จากบอร์ดปัจจุบัน (ต้องแน่ใจว่า Model Board มี field นี้แล้ว)
                 webhook_url = list_obj.board.discord_webhook_url 
                 
-                if webhook_url: # ✅ เช็คว่ามี URL ไหม ถ้ามีค่อยส่ง
-                    # ข้อความที่จะส่งเข้า Discord
+                if webhook_url:
+                    # รวมชื่อทุกคนคั่นด้วยลูกน้ำ
+                    assignee_names = ", ".join([u.username for u in assigned_users]) if assigned_users else "Unassigned"
+                    
                     discord_msg = (
-                        f" **New Task Created!**\n"
+                        f"🆕 **New Task Created!**\n"
                         f"**Task:** {task.title}\n"
                         f"**Board:** {list_obj.board.name}\n"
-                        f"**List:** {list_obj.title}\n"
+                        f"**Assignees:** {assignee_names}\n"
                         f"**By:** {request.user.username}"
                     )
                     
-                    # ส่งเข้า Discord โดยส่ง URL ของบอร์ดนี้ไปด้วย
                     threading.Thread(
                         target=send_discord_notify, 
                         args=(discord_msg, webhook_url)
                     ).start()
                 
             except Exception as e:
-                print(f"Discord Notify Error: {e}") # ถ้า Error ก็แค่ print บอก แต่ไม่ให้เว็บพัง
-            # ==================================================
+                print(f"Discord Notify Error: {e}")
 
             return redirect("board_detail", board_id=list_obj.board.id)
     else:
@@ -389,7 +395,6 @@ def list_reorder(request, board_id):
 
 @login_required
 def task_update(request, task_id):
-    # (Query เดิม)
     task = get_object_or_404(
         Task.objects.filter(
             Q(list__board__created_by=request.user) | Q(list__board__members=request.user)
@@ -398,7 +403,8 @@ def task_update(request, task_id):
     )
 
     if request.method == "POST":
-        old_assigned_to = task.assigned_to # จำคนเก่าไว้
+        # 1. จำรายชื่อคนเก่าไว้ก่อน (เปรียบเทียบหาคนใหม่)
+        old_assignee_ids = set(task.assigned_to.values_list('id', flat=True))
 
         form = TaskForm(request.POST, instance=task)
         if form.is_valid():
@@ -408,37 +414,52 @@ def task_update(request, task_id):
             label_ids = request.POST.getlist('labels')
             updated_task.labels.set(label_ids)
 
-            new_assigned_to = updated_task.assigned_to
+            # 2. จัดการ Assignees ใหม่ (Many-to-Many) ✅
+            new_assignee_ids = request.POST.getlist('assigned_to')
+            
+            # แปลงเป็น Set ของ Int เพื่อเทียบกับ DB
+            new_assignee_ids_set = set(map(int, new_assignee_ids)) if new_assignee_ids else set()
+            
+            # อัปเดตคนรับผิดชอบใน DB
+            users_to_assign = User.objects.filter(id__in=new_assignee_ids_set)
+            updated_task.assigned_to.set(users_to_assign)
+
+            # หาคนที่ "เพิ่งถูกเพิ่ม" (New - Old)
+            added_ids = new_assignee_ids_set - old_assignee_ids
+            added_users = User.objects.filter(id__in=added_ids)
+
+            import threading
 
             # -----------------------------------------------
-            # ส่วนแจ้งเตือน Internal Notification (Code เดิม)
+            # 3. แจ้งเตือน Internal Notification (เฉพาะคนใหม่) ✅
             # -----------------------------------------------
-            if new_assigned_to and new_assigned_to != request.user:
-                if new_assigned_to != old_assigned_to:
+            for user in added_users:
+                if user != request.user:
                     Notification.objects.create(
-                        recipient=new_assigned_to,
+                        recipient=user,
                         actor=request.user,
                         task=updated_task,
                         message=f"ได้มอบหมายงาน '{updated_task.title}' ให้คุณ"
                     )
 
             # -----------------------------------------------
-            #  ส่วนแจ้งเตือน DISCORD (เพิ่มใหม่)
+            # 4. แจ้งเตือน DISCORD (ถ้าทีมเปลี่ยน) ✅
             # -----------------------------------------------
-            import threading
             webhook_url = task.list.board.discord_webhook_url
 
-            if webhook_url:
-                # กรณี 1: มีการเปลี่ยนคนรับผิดชอบ
-                if new_assigned_to != old_assigned_to:
-                    assignee_name = new_assigned_to.username if new_assigned_to else "Unassigned"
-                    msg = (
-                        f" **Task Updated**\n"
-                        f"**Task:** {updated_task.title}\n"
-                        f"**Assignee:** {assignee_name}\n"
-                        f"**By:** {request.user.username}"
-                    )
-                    threading.Thread(target=send_discord_notify, args=(msg, webhook_url)).start()
+            # ถ้าคนเก่า ไม่เท่ากับ คนใหม่ แสดงว่ามีการเปลี่ยนแปลงทีม
+            if webhook_url and (old_assignee_ids != new_assignee_ids_set):
+                # ดึงชื่อคนทั้งหมดใหม่
+                current_assignees = updated_task.assigned_to.all()
+                assignee_names = ", ".join([u.username for u in current_assignees]) if current_assignees else "Unassigned"
+                
+                msg = (
+                    f"🔄 **Task Updated (Assignees Changed)**\n"
+                    f"**Task:** {updated_task.title}\n"
+                    f"**New Team:** {assignee_names}\n"
+                    f"**By:** {request.user.username}"
+                )
+                threading.Thread(target=send_discord_notify, args=(msg, webhook_url)).start()
 
             return redirect("board_detail", board_id=task.list.board.id)
     else:
@@ -1265,7 +1286,11 @@ def fetch_google_calendar_partial(request):
 def reporting_view(request):
     # ... (ส่วน Filter บอร์ด เหมือนเดิม) ...
     user_boards = Board.objects.filter(Q(created_by=request.user) | Q(members=request.user)).distinct()
-    tasks = Task.objects.filter(list__board__in=user_boards, is_archived=False)
+    tasks = Task.objects.filter(
+    Q(list__board__created_by=request.user) | Q(list__board__members=request.user)
+).distinct() \
+ .select_related('list', 'list__board') \
+ .prefetch_related('assigned_to', 'labels')
 
     selected_board_id = request.GET.get('board_id')
     if selected_board_id and selected_board_id != 'all':
@@ -1277,10 +1302,10 @@ def reporting_view(request):
     # ==========================================
     # เตรียม QuerySet สำหรับ Modal List
     # ==========================================
-    all_tasks_qs = tasks.select_related('list__board', 'assigned_to').order_by('-created_at')
-    completed_tasks_qs = tasks.filter(is_completed=True).select_related('list__board', 'assigned_to').order_by('-completed_at')
-    overdue_tasks_qs = tasks.filter(due_date__lt=timezone.now(), is_completed=False).select_related('list__board', 'assigned_to').order_by('due_date')
-    remaining_tasks_qs = tasks.filter(is_completed=False).select_related('list__board', 'assigned_to').order_by('due_date')
+    all_tasks_qs = tasks.select_related('list__board').order_by('-created_at')
+    completed_tasks_qs = tasks.filter(is_completed=True).select_related('list__board').order_by('-completed_at')
+    overdue_tasks_qs = tasks.filter(due_date__lt=timezone.now(), is_completed=False).select_related('list__board').order_by('due_date')
+    remaining_tasks_qs = tasks.filter(is_completed=False).select_related('list__board').order_by('due_date')
 
     # ==========================================
     # คำนวณ KPIs

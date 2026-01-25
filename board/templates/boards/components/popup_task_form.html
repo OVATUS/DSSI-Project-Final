@@ -15,7 +15,22 @@
   <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" @click="taskModalOpen = false"></div>
 
   {# Modal Panel #}
-  <div class="relative w-full max-w-2xl bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" @click.stop x-data="{ activeTab: 'details', editDesc: false }">
+  <div class="relative w-full max-w-2xl bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" 
+     @click.stop 
+     x-data="{ 
+         activeTab: 'details', 
+         editDesc: false,
+         // ✅ เพิ่มฟังก์ชันนี้เพื่อรับค่าจาก Card เมื่อเปิด Modal
+         initAssignees() {
+             // เช็คว่าตัวแปร global taskAssignedTo มีค่าไหม
+             if (typeof taskAssignedTo !== 'undefined' && Array.isArray(taskAssignedTo)) {
+                 // ส่งค่าเข้าไปใน Component ลูก (Dropdown) ผ่าน Event หรือ Global state
+                 // แต่วิธีที่ง่ายกว่าคือ ให้ Dropdown มันอ่านค่า taskAssignedTo โดยตรง
+             }
+         }
+     }"
+     x-init="$watch('taskModalOpen', value => { if(value) initAssignees() })"
+>
     
     <form id="taskForm" method="post" :action="taskActionUrl" class="flex flex-col h-full overflow-hidden">
         {% csrf_token %}
@@ -59,14 +74,114 @@
                 </select>
             </div>
 
-            {# Assignee #}
-            <div class="relative flex items-center bg-white border border-gray-200 rounded-md hover:border-indigo-300 transition-colors shadow-sm px-2 h-8">
-                <span class="text-xs text-gray-400 mr-1">ผู้ดูแล:</span>
-                <select name="assigned_to" x-model="taskAssignedTo" class="text-xs bg-transparent border-none focus:ring-0 text-gray-700 p-0 font-medium cursor-pointer max-w-[100px]">
-                    <option value="">(ว่าง)</option>
+            {# Assignee (Multi-Select) - แก้ไขใหม่ #}
+            <div class="relative h-8" x-data="{ 
+                openAssignee: false,
+                localAssignees: [], // ✅ สร้างตัวแปร Local ไว้เก็บค่าในนี้โดยเฉพาะ
+                allUsers: [
                     {% for u in users %}
-                    <option value="{{ u.id }}">{{ u.username }}</option>
+                    { 
+                        id: {{ u.id }}, 
+                        name: '{{ u.username|escapejs }}', 
+                        avatar: '{% if u.profile_image %}{{ u.profile_image.url }}{% endif %}',
+                        initial: '{{ u.username.0|upper }}'
+                    },
                     {% endfor %}
+                ],
+                
+                // ✅ ฟังก์ชันสำคัญ: ทำงานเมื่อเปิด Modal
+                init() {
+                    this.$watch('taskModalOpen', (isOpen) => {
+                        if (isOpen) {
+                            // ถ้ามีตัวแปร taskAssignedTo ส่งมาจาก Card ให้ก๊อปปี้มาใส่ localAssignees
+                            if (typeof taskAssignedTo !== 'undefined' && Array.isArray(taskAssignedTo)) {
+                                this.localAssignees = [...taskAssignedTo];
+                            } else {
+                                this.localAssignees = [];
+                            }
+                        }
+                    });
+                },
+
+                toggleUser(id) {
+                    id = parseInt(id);
+                    if (this.localAssignees.includes(id)) {
+                        this.localAssignees = this.localAssignees.filter(uId => uId !== id);
+                    } else {
+                        this.localAssignees.push(id);
+                    }
+                },
+                
+                isSelected(id) {
+                    return this.localAssignees.includes(parseInt(id));
+                }
+            }">
+                
+                {# Trigger Button #}
+                <div class="flex items-center gap-2 bg-white border border-gray-200 rounded-md hover:border-indigo-300 transition-colors shadow-sm px-2 h-full cursor-pointer min-w-[120px]"
+                     @click="openAssignee = !openAssignee"
+                     @click.outside="openAssignee = false">
+                    
+                    <span class="text-xs text-gray-400 shrink-0">ผู้ดูแล:</span>
+
+                    {# Selected Avatars #}
+                    <div class="flex items-center -space-x-1.5 overflow-hidden flex-1">
+                        <template x-for="uid in localAssignees" :key="uid">
+                            <template x-for="user in allUsers">
+                                <div x-show="user.id === parseInt(uid)" class="w-5 h-5 rounded-full ring-1 ring-white bg-gray-200 flex items-center justify-center text-[8px] font-bold text-gray-600 overflow-hidden shrink-0" :title="user.name">
+                                    <template x-if="user.avatar">
+                                        <img :src="user.avatar" class="w-full h-full object-cover">
+                                    </template>
+                                    <template x-if="!user.avatar">
+                                        <span x-text="user.initial"></span>
+                                    </template>
+                                </div>
+                            </template>
+                        </template>
+                        
+                        {# Empty State #}
+                        <div x-show="localAssignees.length === 0" class="text-[10px] text-gray-400 italic pl-1">(ว่าง)</div>
+                    </div>
+
+                    {# Icon + #}
+                    <div class="ml-auto text-gray-400">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </div>
+                </div>
+
+                {# Dropdown List #}
+                <div x-show="openAssignee" 
+                     x-transition 
+                     class="absolute top-full left-0 mt-1 w-56 bg-white border border-gray-100 rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto p-1 custom-scrollbar">
+                    
+                    <template x-for="user in allUsers" :key="user.id">
+                        <div @click.stop="toggleUser(user.id)" 
+                             class="flex items-center gap-3 px-2 py-2 hover:bg-gray-50 rounded-md cursor-pointer transition-colors"
+                             :class="isSelected(user.id) ? 'bg-indigo-50/50' : ''">
+                            
+                            {# Checkbox Visual #}
+                            <div class="w-4 h-4 border rounded flex items-center justify-center transition-colors shrink-0"
+                                 :class="isSelected(user.id) ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-300 bg-white'">
+                                <svg x-show="isSelected(user.id)" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+
+                            {# User Info #}
+                            <div class="flex items-center gap-2 min-w-0">
+                                <div class="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[9px] font-bold overflow-hidden shrink-0">
+                                    <template x-if="user.avatar"><img :src="user.avatar" class="w-full h-full object-cover"></template>
+                                    <template x-if="!user.avatar"><span x-text="user.initial"></span></template>
+                                </div>
+                                <span class="text-xs text-gray-700 truncate font-medium" x-text="user.name"></span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                {# ✅ Hidden Select (สำคัญมาก: ส่งค่าไป Django) #}
+                <select name="assigned_to" multiple class="hidden">
+                    <template x-for="uid in localAssignees" :key="uid">
+                        <option :value="uid" selected></option>
+                    </template>
                 </select>
             </div>
         </div>
