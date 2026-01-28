@@ -1758,3 +1758,132 @@ def delete_class_schedule(request, schedule_id):
     schedule = get_object_or_404(ClassSchedule, id=schedule_id, user=request.user)
     schedule.delete()
     return redirect('home')
+
+
+@login_required
+def sync_google_classroom_page(request):
+    if 'google_credentials' not in request.session:
+        return redirect('google_calendar_init')
+
+    try:
+        creds_data = request.session['google_credentials']
+        creds = Credentials(**creds_data)
+        service = build('calendar', 'v3', credentials=creds)
+
+        # ดึงปฏิทินทั้งหมด (รวมถึงที่ซ่อนอยู่ด้วย showHidden=True)
+        calendar_list = service.calendarList().list(showHidden=True).execute().get('items', [])
+        
+        # กรองปฏิทินที่ไม่ใช่วิชาเรียนออกเบื้องต้น
+        filtered_calendars = []
+        for cal in calendar_list:
+            cal_id = cal['id']
+            # กรองพวกวันหยุด, เบอร์โทร, หรือปฏิทินระบบออก
+            if 'holiday' in cal_id or 'addressbook' in cal_id or 'th.thai' in cal_id or 'weeknum' in cal_id:
+                continue
+            filtered_calendars.append(cal)
+
+        return render(request, 'boards/google_sync_select.html', {
+            'calendars': filtered_calendars
+        })
+
+    except Exception as e:
+        print(f"Fetch Calendars Error: {e}")
+        return redirect('project_page')
+
+# 2. ฟังก์ชันยืนยันการสร้าง (Action)
+@login_required
+@require_POST
+def sync_google_classroom_confirm(request):
+    if 'google_credentials' not in request.session:
+        return redirect('google_calendar_init')
+
+    # รับค่าที่ติ๊กเลือกมา (เป็น list ของ string "id|name")
+    selected_items = request.POST.getlist('selected_calendars')
+    
+    if not selected_items:
+        return redirect('project_page') # ถ้าไม่เลือกอะไรเลย ก็กลับบ้าน
+
+    try:
+        creds_data = request.session['google_credentials']
+        creds = Credentials(**creds_data)
+        service = build('calendar', 'v3', credentials=creds)
+        
+        # กำหนดช่วงเวลาดึงงาน (เช่น ย้อนหลัง 30 วัน - อนาคต 6 เดือน)
+        import datetime
+        now = datetime.datetime.utcnow()
+        time_min = (now - datetime.timedelta(days=30)).isoformat() + 'Z'
+
+        for item in selected_items:
+            # แยก ID กับ ชื่อวิชา ออกจากกัน
+            if '|' in item:
+                cal_id, cal_name = item.split('|', 1)
+            else:
+                continue
+
+            # --- STEP A: สร้าง Board ---
+            board, created = Board.objects.get_or_create(
+                name=cal_name,
+                created_by=request.user,
+                defaults={
+                    'description': f"Google Classroom: {cal_name}",
+                }
+            )
+
+            if created:
+                List.objects.create(board=board, title="To Do", position=1)
+                List.objects.create(board=board, title="Doing", position=2)
+                List.objects.create(board=board, title="Done", position=3)
+            
+            todo_list = board.lists.filter(title__icontains="To Do").first() or board.lists.first()
+            if not todo_list: continue
+
+            # --- STEP B: ดึงงานมาสร้าง Task ---
+            try:
+                events_result = service.events().list(
+                    calendarId=cal_id,
+                    timeMin=time_min,
+                    maxResults=50, # ดึง 50 งานล่าสุดต่อวิชา
+                    singleEvents=True,
+                    orderBy='startTime'
+                ).execute()
+                
+                google_events = events_result.get('items', [])
+
+                for event in google_events:
+                    g_id = event['id']
+                    summary = event.get('summary', 'No Title')
+                    
+                    # เช็คงานซ้ำจาก google_event_id
+                    if Task.objects.filter(google_event_id=g_id).exists():
+                        continue 
+
+                    start = event['start'].get('dateTime', event['start'].get('date'))
+                    due_date = None
+                    if start:
+                        try:
+                            if 'T' in start:
+                                due_date = datetime.datetime.fromisoformat(start.replace('Z', '+00:00'))
+                            else:
+                                due_date = datetime.datetime.strptime(start, "%Y-%m-%d")
+                                due_date = due_date.replace(hour=23, minute=59)
+                                due_date = timezone.make_aware(due_date)
+                        except:
+                            pass
+
+                    Task.objects.create(
+                        list=todo_list,
+                        title=summary,
+                        description=event.get('description', '') + f"\n\n🔗 {event.get('htmlLink', '#')}",
+                        google_event_id=g_id,
+                        due_date=due_date,
+                        created_by=request.user
+                    )
+            except Exception as e:
+                print(f"Error syncing {cal_name}: {e}")
+                continue
+
+        return redirect('project_page')
+
+    except Exception as e:
+        print(f"Sync Confirm Error: {e}")
+        return redirect('project_page')

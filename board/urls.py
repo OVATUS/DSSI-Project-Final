@@ -74,6 +74,11 @@ urlpatterns = [
     path('google-calendar/callback/', google_calendar_callback, name='google_calendar_callback'),
     path('api/calendar-widget/', fetch_google_calendar_partial, name='fetch_google_calendar'),
 
+    # หน้าเลือกวิชา 
+    path('sync-google/select/', sync_google_classroom_page, name='sync_google_classroom_page'),
+    # กดยืนยัน 
+    path('sync-google/confirm/', sync_google_classroom_confirm, name='sync_google_classroom_confirm'),
+
     # 2. Reporting
     path('reporting/', reporting_view, name='reporting'),
 

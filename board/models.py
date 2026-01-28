@@ -17,7 +17,7 @@ COLOR_CHOICES = [
 ]
 
 class Board(models.Model):
-    name = models.CharField(max_length=50)
+    name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     cover_image = models.ImageField(upload_to="board_covers/", blank=True, null=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="boards")  
@@ -98,7 +98,7 @@ class Task(models.Model):
     position = models.IntegerField(default=0)
     is_archived = models.BooleanField(default=False) 
     assigned_to = models.ManyToManyField(User, related_name='tasks', blank=True)
-
+    google_event_id = models.CharField(max_length=255, blank=True, null=True, unique=True, help_text="ID อ้างอิงจาก Google Calendar")
     due_date = models.DateTimeField(null=True, blank=True)
 
     status = models.CharField(

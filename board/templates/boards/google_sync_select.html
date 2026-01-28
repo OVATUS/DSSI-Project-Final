@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto py-10 px-4">
+    <div class="bg-white shadow-md rounded-lg p-6">
+        <h1 class="text-2xl font-bold text-gray-800 mb-2"> เลือกวิชาจาก Google Classroom</h1>
+        <p class="text-gray-600 mb-6">เลือกรายวิชาที่คุณต้องการนำมาสร้างเป็นบอร์ด Board ในระบบ</p>
+
+        <form method="POST" action="{% url 'sync_google_classroom_confirm' %}">
+            {% csrf_token %}
+            
+            <div class="space-y-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                {% if calendars %}
+                    {% for cal in calendars %}
+                    <label class="flex items-center p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                        <input type="checkbox" name="selected_calendars" value="{{ cal.id }}|{{ cal.summary }}" 
+                               class="w-5 h-5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                        
+                        <div class="ml-3">
+                            <span class="block text-sm font-medium text-gray-900">{{ cal.summary }}</span>
+                            <span class="block text-xs text-gray-400">ID: {{ cal.id|truncatechars:20 }}</span>
+                        </div>
+                    </label>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-10 text-gray-400">
+                        ไม่พบปฏิทิน หรือคุณยังไม่ได้เชื่อมต่อ Google Calendar
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="mt-8 flex justify-end gap-3">
+                <a href="{% url 'project_page' %}" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+                    ยกเลิก
+                </a>
+                <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 shadow-sm">
+                    นำเข้าวิชาที่เลือก
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
