@@ -40,6 +40,7 @@ urlpatterns = [
     path("task/<int:task_id>/edit/", task_update, name="task_update"),
     path("task/<int:task_id>/delete/", task_delete, name="task_delete"),
     path("task/move/", task_move, name="task_move"),
+    path('api/calendar/update-date/', api_update_task_date, name='api_update_task_date'),
 
     # Label URLs
     path('label/<int:label_id>/delete/', delete_label, name='delete_label'),

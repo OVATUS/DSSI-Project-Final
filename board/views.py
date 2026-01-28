@@ -569,6 +569,48 @@ def toggle_task_archive(request, task_id):
         'message': 'Task archived successfully' if task.is_archived else 'Task unarchived successfully'
     })
 
+@require_POST
+@login_required
+def api_update_task_date(request):
+    import json
+    try:
+        data = json.loads(request.body)
+        task_id = data.get('task_id')
+        new_date_str = data.get('new_date') # Format: YYYY-MM-DD
+        
+        if not task_id or not new_date_str:
+            return JsonResponse({'success': False, 'error': 'Missing data'}, status=400)
+
+        # หา Task (เช็คสิทธิ์ด้วย)
+        task = get_object_or_404(
+            Task, 
+            Q(list__board__created_by=request.user) | Q(list__board__members=request.user),
+            id=task_id
+        )
+        
+        # แปลงวันที่ที่ส่งมา แล้ว Update (โดยคงเวลาเดิมไว้ หรือตั้งเป็น 23:59 ก็ได้)
+        # ในที่นี้สมมติว่าเอาแค่ "วัน" เปลี่ยน แต่ "เวลา" เอาตาม Default หรือคงเดิม
+        # แต่เพื่อความง่าย เราจะ parse เป็น datetime
+        from django.utils.dateparse import parse_datetime, parse_date
+        
+        # ถ้า FullCalendar ส่งมาแค่ YYYY-MM-DD ให้เราเติมเวลาให้หน่อย (เช่น 09:00 หรือเวลาเดิม)
+        # แต่ถ้า User ลากใน Month View มักจะได้แค่ Date
+        new_date = parse_date(new_date_str)
+        
+        if task.due_date:
+            # คงเวลาเดิมไว้ เปลี่ยนแค่วัน
+            task.due_date = task.due_date.replace(year=new_date.year, month=new_date.month, day=new_date.day)
+        else:
+            # ถ้าของเดิมไม่มีเวลา ให้ตั้งเป็นเที่ยงวัน
+            task.due_date = timezone.make_aware(datetime.datetime.combine(new_date, datetime.time(12, 0)))
+
+        task.save()
+        
+        return JsonResponse({'success': True})
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
 
 # =========================== #
 #        Label VIEWS          #
@@ -1087,7 +1129,11 @@ def global_calendar_view(request):
 
 @login_required
 def api_calendar_events(request):
-    # ส่วนที่ 1: ดึงงานจาก Board (Local Database)
+    events = []
+
+    # ==========================================
+    # 1. LOCAL TASKS: งานจากบอร์ดของเรา
+    # ==========================================
     board_id = request.GET.get('board_id')
     
     tasks = Task.objects.filter(
@@ -1100,8 +1146,6 @@ def api_calendar_events(request):
 
     if board_id and board_id != 'all':
         tasks = tasks.filter(list__board_id=board_id)
-
-    events = []
     
     for task in tasks:
         color = '#3B82F6' 
@@ -1115,20 +1159,51 @@ def api_calendar_events(request):
             'backgroundColor': color,
             'borderColor': color,
             'textColor': '#ffffff',
-            'allDay': False
+            'allDay': False,
+            # เพิ่ม extendedProps เพื่อให้ Frontend รู้ว่าเป็น Task (ยอมให้ลากได้)
+            'extendedProps': {
+                'type': 'task'
+            }
         })
 
-    # ส่วนที่ 2: ดึงงานจาก Google Calendar (API)
+    # ==========================================
+    # 2. CLASS SCHEDULE: ตารางเรียน (แสดงซ้ำทุกสัปดาห์)
+    # ==========================================
+    # Map วันให้ตรงกับ format ของ FullCalendar (0=Sun, 1=Mon, ...)
+    day_map = {
+        'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6
+    }
+    
+    schedules = ClassSchedule.objects.filter(user=request.user)
+    
+    for sched in schedules:
+        if sched.day in day_map:
+            events.append({
+                'title': f"📚 {sched.subject_name}", 
+                'daysOfWeek': [day_map[sched.day]], # สั่งให้ Event นี้เกิดซ้ำทุกๆ วันที่ระบุ
+                'startTime': sched.start_time.strftime('%H:%M'), 
+                'endTime': sched.end_time.strftime('%H:%M'),    
+                'backgroundColor': '#8B5CF6', # สีม่วง (Schedule)
+                'borderColor': '#7C3AED',
+                'textColor': '#ffffff',
+                'editable': False, # ห้ามลากเปลี่ยนวัน
+                'extendedProps': {
+                    'type': 'schedule'
+                }
+            })
+
+    # ==========================================
+    # 3. GOOGLE CALENDAR: ดึงงาน + ลิงก์ Meet
+    # ==========================================
     if 'google_credentials' in request.session:
         try:
             creds_data = request.session['google_credentials']
             creds = Credentials(**creds_data)
             service = build('calendar', 'v3', credentials=creds)
             
-            # กำหนดเวลาย้อนหลัง 1 ปี (เพื่อให้เห็นงานเก่าใน Classroom ด้วย)
+            # ย้อนหลัง 1 ปี
             start_time = (datetime.datetime.utcnow() - datetime.timedelta(days=365)).isoformat() + 'Z'
             
-            # ดึงรายชื่อปฏิทินทั้งหมด
             calendar_list_result = service.calendarList().list(showHidden=True).execute()
             calendars = calendar_list_result.get('items', [])
             
@@ -1136,15 +1211,14 @@ def api_calendar_events(request):
                 cal_id = calendar_entry['id']
                 cal_summary = calendar_entry.get('summary', 'Unknown')
                 
-                # Filter: ข้ามปฏิทินที่ไม่จำเป็น
                 if 'holiday' in cal_id or 'addressbook' in cal_id or 'th.thai' in cal_id:
                     continue
 
                 try:
                     events_result = service.events().list(
                         calendarId=cal_id,
-                        timeMin=start_time,  # ดึงย้อนหลัง 1 ปี
-                        maxResults=50,       # เพิ่มจำนวนต่อวิชาเผื่อมีงานเยอะ
+                        timeMin=start_time, 
+                        maxResults=50,      
                         singleEvents=True,
                         orderBy='startTime'
                     ).execute()
@@ -1152,26 +1226,37 @@ def api_calendar_events(request):
                     google_events = events_result.get('items', [])
                     
                     for event in google_events:
-                        # ดึงวันที่ (รองรับทั้งแบบระบุเวลา และแบบทั้งวัน)
                         start = event['start'].get('dateTime', event['start'].get('date'))
                         event_title = event.get('summary', 'No Title')
                         is_all_day = 'date' in event['start']
                         
+                        # ✅ Check หา Google Meet Link
+                        meet_link = event.get('hangoutLink')
+                        html_link = event.get('htmlLink')
+                        
+                        # ถ้ามี Meet Link ให้ใช้เป็น URL หลัก (กดแล้วไป Meet เลย)
+                        # ถ้าไม่มี ให้ไปหน้าปฏิทิน Google ปกติ
+                        final_url = meet_link if meet_link else html_link
+                        
                         events.append({
                             'title': f"[{cal_summary}] {event_title}", 
                             'start': start,
-                            'url': event.get('htmlLink'),
-                            'backgroundColor': '#F59E0B',
+                            'url': final_url,
+                            'backgroundColor': '#F59E0B', # สีส้ม
                             'borderColor': '#F59E0B',
                             'textColor': '#ffffff',
-                            'allDay': is_all_day
+                            'allDay': is_all_day,
+                            'editable': False, # ห้ามลากแก้ไข
+                            'extendedProps': {
+                                'is_google': True,
+                                'has_meet': bool(meet_link) # ส่ง Flag ไปบอก Frontend ให้โชว์ไอคอนกล้อง
+                            }
                         })
                         
                 except Exception:
                     continue
                 
         except Exception:
-            # กรณี Session หมดอายุ หรือ Error อื่นๆ ให้ข้ามไปเงียบๆ
             pass
 
     return JsonResponse(events, safe=False)

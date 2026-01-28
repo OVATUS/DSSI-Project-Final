@@ -21,7 +21,7 @@
         {# Controls (Right): Google Sync Button + Filter Dropdown #}
         <div class="flex items-center gap-4">
             
-            {# [MOVED UP] Google Calendar Sync Button #}
+            {# Google Calendar Sync Button #}
             <div>
                 {% if request.session.google_credentials %}
                     <span class="inline-flex items-center px-3 py-1.5 bg-green-50 text-green-700 text-xs font-semibold rounded-full border border-green-100 shadow-sm cursor-default" title="เชื่อมต่อแล้ว">
@@ -87,20 +87,101 @@
             },
             locale: 'th',
             navLinks: true,
-            editable: false,
-            dayMaxEvents: true, // ถ้า Event เยอะเกินจะซ่อนแล้วขึ้น +more
-            height: '100%', // ให้ความสูงเต็มพื้นที่ Parent
+            dayMaxEvents: true,
+            height: '100%',
             
-            // แหล่งข้อมูล Event เริ่มต้น (All)
+            // --- Feature 1: Drag & Drop Configuration ---
+            editable: true, // เปิดให้ลากได้
+
+            // กฏการลาก: ให้ลากเฉพาะ Task ของเรา (ที่มี URL /board/...) ห้ามลาก Google Event หรือ ตารางเรียน
+            eventAllow: function(dropInfo, draggedEvent) {
+                // เช็คจาก extendedProps ที่เราส่งมาจาก Backend
+                if (draggedEvent.extendedProps.is_google || draggedEvent.extendedProps.type === 'schedule') {
+                    return false;
+                }
+                return true;
+            },
+
+            // เมื่อวาง (Drop) เสร็จแล้ว ให้ทำอะไร?
+            eventDrop: function(info) {
+                // ดึง Task ID จาก URL (เช่น ...?task_id=55)
+                let taskId = null;
+                if (info.event.url && info.event.url.includes('task_id=')) {
+                    const urlParams = new URLSearchParams(info.event.url.split('?')[1]);
+                    taskId = urlParams.get('task_id');
+                }
+
+                if (taskId) {
+                    // ยิง AJAX ไปบอก Backend
+                    fetch('{% url "api_update_task_date" %}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': '{{ csrf_token }}'
+                        },
+                        body: JSON.stringify({
+                            task_id: taskId,
+                            new_date: info.event.startStr.split('T')[0] // ส่งไปแค่ YYYY-MM-DD
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (!data.success) {
+                            alert('เกิดข้อผิดพลาด: ' + (data.error || 'Cannot update date'));
+                            info.revert(); // ย้ายกลับที่เดิม
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Network error');
+                        info.revert();
+                    });
+                } else {
+                    info.revert();
+                }
+            },
+
+            // --- Navigation ---
+            // ป้องกันการเปิด Link ตอนลากวาง แต่ถ้าคลิกปกติให้ไปตาม Link
+            eventClick: function(info) {
+                info.jsEvent.preventDefault(); // หยุด Default ของ Browser ไว้ก่อน
+                if (info.event.url) {
+                    // เปิดในแท็บใหม่ถ้าเป็น Google / Meet, เปิดหน้าเดิมถ้าเป็น Task
+                    if (info.event.extendedProps.is_google) {
+                        window.open(info.event.url, '_blank');
+                    } else {
+                        window.location.href = info.event.url;
+                    }
+                }
+            },
+
+            // แหล่งข้อมูล Event
             events: '{% url "api_calendar_events" %}?board_id=all',
 
-            // ปรับแต่ง Event UI
+            // --- Feature 2 & 3: Custom UI (Meet Icon) ---
             eventContent: function(arg) {
+                let isMeet = arg.event.extendedProps.has_meet;
+                let isGoogle = arg.event.extendedProps.is_google;
+                let titleText = arg.event.title;
+                
+                let iconHtml = '';
+                if (isMeet) {
+                    iconHtml = '<span class="mr-1 text-[10px] shrink-0">📹</span>'; // เพิ่ม shrink-0 กันไอคอนบี้
+                } else if (!isGoogle) {
+                    // ถ้าเป็น Task ปกติ ใส่จุดสีขาว
+                    iconHtml = '<span class="w-1.5 h-1.5 rounded-full bg-white shrink-0 opacity-70 mr-1"></span>';
+                }
+
                 let italicEl = document.createElement('div');
+                // ✅ แก้ไข CSS ตรงนี้ให้แล้วครับ: เพิ่ม w-full ที่แม่ และ flex-1 min-w-0 ที่ลูก
+                // เพื่อให้มั่นใจว่ามันจะตัดคำได้จริงๆ
+                italicEl.className = 'w-full overflow-hidden'; // เพิ่ม class ให้ wrapper ชั้นนอกสุดด้วย
                 italicEl.innerHTML = `
-                    <div class="flex items-center gap-1 overflow-hidden px-1 py-0.5">
-                        <span class="w-1.5 h-1.5 rounded-full bg-white shrink-0 opacity-70"></span>
-                        <div class="text-xs font-medium truncate">${arg.event.title}</div>
+                    <div class="flex items-center px-1 py-0.5 w-full">
+                        ${iconHtml}
+                        <div class="text-xs font-medium truncate flex-1 min-w-0 ${isMeet ? 'font-bold text-white' : ''}">
+                            ${titleText}
+                        </div>
                     </div>
                 `;
                 return { domNodes: [italicEl] }
@@ -109,31 +190,21 @@
         
         calendar.render();
 
-        // 2. Filter Logic (เมื่อเปลี่ยน Dropdown)
+        // Filter Logic
         boardFilter.addEventListener('change', function() {
             var selectedBoardId = this.value;
-            
-            // ลบ Event Source เดิมออก
             var oldSource = calendar.getEventSources()[0];
-            if (oldSource) {
-                oldSource.remove();
-            }
-
-            // เพิ่ม Event Source ใหม่พร้อม Parameter board_id
-            calendar.addEventSource(
-                `{% url "api_calendar_events" %}?board_id=${selectedBoardId}`
-            );
+            if (oldSource) { oldSource.remove(); }
+            calendar.addEventSource(`{% url "api_calendar_events" %}?board_id=${selectedBoardId}`);
         });
     });
 </script>
 
-{# --- Custom CSS for Calendar Beautification --- #}
+{# --- Custom CSS --- #}
 <style>
-    /* ปรับแต่ง Font และสี */
     .fc { font-family: 'Inter', sans-serif; }
     .fc-toolbar-title { font-size: 1.25rem !important; font-weight: 800; color: #1f2937; }
     
-    /* ปุ่มต่างๆ */
     .fc-button-primary { 
         background-color: white !important; 
         border-color: #e5e7eb !important; 
@@ -154,13 +225,11 @@
         border-color: #c7d2fe !important;
     }
 
-    /* ตารางปฏิทิน */
     .fc-theme-standard td, .fc-theme-standard th { border-color: #f3f4f6; }
     .fc-col-header-cell-cushion { padding: 8px 0; font-size: 0.85rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
     .fc-daygrid-day-number { color: #374151; font-weight: 500; padding: 8px !important; }
-    .fc-day-today { background-color: #fdf2f8 !important; } /* สีพื้นหลังวันปัจจุบัน (ชมพูจางๆ) */
+    .fc-day-today { background-color: #fdf2f8 !important; }
 
-    /* ตัว Event */
     .fc-event { 
         border-radius: 6px; 
         border: none; 
