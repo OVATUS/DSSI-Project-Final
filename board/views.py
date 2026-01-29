@@ -22,6 +22,7 @@ import requests
 from django.core.mail import send_mail
 import threading
 from django.core.cache import cache
+from django.contrib import messages
 
 @login_required
 @require_POST
@@ -1750,7 +1751,7 @@ def create_class_schedule(request):
             schedule = form.save(commit=False)
             schedule.user = request.user
             schedule.save()
-    return redirect('home') # หรือชื่อ URL หน้า dashboard ของคุณ
+    return redirect('home') 
 
 
 @login_required
@@ -1790,43 +1791,44 @@ def sync_google_classroom_page(request):
         print(f"Fetch Calendars Error: {e}")
         return redirect('project_page')
 
-# 2. ฟังก์ชันยืนยันการสร้าง (Action)
+
 @login_required
 @require_POST
 def sync_google_classroom_confirm(request):
+    # 1. เช็คสิทธิ์ Google
     if 'google_credentials' not in request.session:
         return redirect('google_calendar_init')
 
-    # รับค่าที่ติ๊กเลือกมา (เป็น list ของ string "id|name")
     selected_items = request.POST.getlist('selected_calendars')
-    
     if not selected_items:
-        return redirect('project_page') # ถ้าไม่เลือกอะไรเลย ก็กลับบ้าน
+        return redirect('project_page')
 
     try:
+        # 2. เตรียม Service
         creds_data = request.session['google_credentials']
         creds = Credentials(**creds_data)
         service = build('calendar', 'v3', credentials=creds)
         
-        # กำหนดช่วงเวลาดึงงาน (เช่น ย้อนหลัง 30 วัน - อนาคต 6 เดือน)
-        import datetime
+        # กำหนดช่วงเวลา (ย้อนหลัง 90 วัน)
         now = datetime.datetime.utcnow()
-        time_min = (now - datetime.timedelta(days=30)).isoformat() + 'Z'
+        time_min = (now - datetime.timedelta(days=90)).isoformat() + 'Z'
+
+        created_count = 0
+        error_logs = []
 
         for item in selected_items:
-            # แยก ID กับ ชื่อวิชา ออกจากกัน
             if '|' in item:
                 cal_id, cal_name = item.split('|', 1)
             else:
                 continue
 
-            # --- STEP A: สร้าง Board ---
+            # ---------------------------------------------------
+            # STEP A: สร้าง Board (ถ้ายังไม่มี)
+            # ---------------------------------------------------
             board, created = Board.objects.get_or_create(
-                name=cal_name,
+                name=cal_name[:255], # ตัดชื่อกันเหนียว (Model Board คุณน่าจะแก้เป็น 255 แล้ว)
                 created_by=request.user,
-                defaults={
-                    'description': f"Google Classroom: {cal_name}",
-                }
+                defaults={'description': f"Google Classroom: {cal_name}"}
             )
 
             if created:
@@ -1834,15 +1836,21 @@ def sync_google_classroom_confirm(request):
                 List.objects.create(board=board, title="Doing", position=2)
                 List.objects.create(board=board, title="Done", position=3)
             
-            todo_list = board.lists.filter(title__icontains="To Do").first() or board.lists.first()
-            if not todo_list: continue
+            # หา List เป้าหมาย (To Do)
+            todo_list = board.lists.filter(title__icontains="To Do").first()
+            if not todo_list:
+                todo_list = board.lists.first() # ถ้าไม่มี To Do เอาอันแรกสุด
+            
+            if not todo_list: continue # ถ้าไม่มี List เลยก็ข้าม
 
-            # --- STEP B: ดึงงานมาสร้าง Task ---
+            # ---------------------------------------------------
+            # STEP B: ดึงงานจาก Google Calendar
+            # ---------------------------------------------------
             try:
                 events_result = service.events().list(
                     calendarId=cal_id,
                     timeMin=time_min,
-                    maxResults=50, # ดึง 50 งานล่าสุดต่อวิชา
+                    maxResults=50,
                     singleEvents=True,
                     orderBy='startTime'
                 ).execute()
@@ -1851,39 +1859,75 @@ def sync_google_classroom_confirm(request):
 
                 for event in google_events:
                     g_id = event['id']
-                    summary = event.get('summary', 'No Title')
-                    
-                    # เช็คงานซ้ำจาก google_event_id
+                    summary = event.get('summary', '(No Title)')
+
+                    # 1. เช็คงานซ้ำ (Duplicate Check)
                     if Task.objects.filter(google_event_id=g_id).exists():
                         continue 
+                    
+                    # 2. เตรียมข้อมูล Description + Link
+                    desc_text = event.get('description', '') or "-"
+                    link = event.get('htmlLink', '#')
+                    final_desc = f"{desc_text}\n\n🔗 Google Link:\n{link}"
 
+                    # 3. แปลงวันที่ (Due Date Parsing)
                     start = event['start'].get('dateTime', event['start'].get('date'))
                     due_date = None
                     if start:
                         try:
                             if 'T' in start:
+                                # มีเวลา (datetime)
                                 due_date = datetime.datetime.fromisoformat(start.replace('Z', '+00:00'))
                             else:
+                                # มีแต่วันที่ (date) -> ตั้งเป็น 23:59 ของวันนั้น
                                 due_date = datetime.datetime.strptime(start, "%Y-%m-%d")
                                 due_date = due_date.replace(hour=23, minute=59)
                                 due_date = timezone.make_aware(due_date)
-                        except:
+                        except Exception:
                             pass
 
-                    Task.objects.create(
-                        list=todo_list,
-                        title=summary,
-                        description=event.get('description', '') + f"\n\n🔗 {event.get('htmlLink', '#')}",
-                        google_event_id=g_id,
-                        due_date=due_date,
-                        created_by=request.user
-                    )
+                    # 4. สร้าง Task
+                    try:
+                        task = Task.objects.create(
+                            list=todo_list,
+                            title=summary[:255],     # ตัดชื่อไม่ให้เกิน 255
+                            description=final_desc,
+                            due_date=due_date,
+                            google_event_id=g_id,
+                            
+                            # ค่า Default ตาม Model
+                            position=0, 
+                            priority=Task.Priority.MEDIUM,
+                            status=Task.Status.TODO,
+                            is_completed=False,
+                            is_archived=False
+                            
+                            # ❌ ตัด created_by ออก เพราะใน Model ไม่มี field นี้
+                        )
+                        
+                        # ✅ เพิ่มคนรับผิดชอบ (Assigned To) เป็นคนกด Sync
+                        task.assigned_to.add(request.user)
+                        
+                        created_count += 1
+                        
+                    except Exception as e:
+                        print(f"❌ Error Saving Task '{summary}': {e}")
+                        error_logs.append(f"{summary}: {e}")
+
             except Exception as e:
-                print(f"Error syncing {cal_name}: {e}")
+                print(f"❌ API Error for Calendar {cal_name}: {e}")
                 continue
+
+        # แจ้งผลลัพธ์
+        if error_logs:
+            messages.warning(request, f"นำเข้าได้ {created_count} งาน แต่มีข้อผิดพลาดบางรายการ")
+        elif created_count == 0:
+            messages.info(request, "ไม่พบงานใหม่ในช่วง 90 วันที่ผ่านมา")
+        else:
+            messages.success(request, f"สำเร็จ! นำเข้า {created_count} งานเรียบร้อยแล้ว")
 
         return redirect('project_page')
 
     except Exception as e:
-        print(f"Sync Confirm Error: {e}")
+        messages.error(request, f"Critical Error: {e}")
         return redirect('project_page')
