@@ -22,6 +22,7 @@ function projectPage() {
         openEdit: false,
         editActionUrl: '',
         editName: '',
+        editDiscordUrl: '',
         editDescription: '',
         editCoverPreview: null,
         openDelete: false,
@@ -57,6 +58,7 @@ window.boardDetailPage = function (config) {
         archivedDrawerOpen: false, // เปิด/ปิดลิ้นชัก
         archivedTasks: [],         // เก็บรายการงานที่ดึงมา
         isLoadingArchived: false,  // สถานะโหลด
+        taskRemindDays: 0,
         
         // ✅ 1. เพิ่มตัวแปรนี้ (สำคัญมาก ไม่งั้น Alpine จะหาไม่เจอ)
         taskIsArchived: false, 
@@ -92,6 +94,15 @@ window.boardDetailPage = function (config) {
         activities: [],
         isLoadingActivities: false,
         menuOpen: false,
+
+        // Return a human readable label for remind days (used by popup form)
+        remindLabel(days) {
+            const d = parseInt(days) || 0;
+            if (d <= 0) return 'ไม่แจ้งเตือน';
+            if (d === 1) return 'ล่วงหน้า 1 วัน';
+            if (d === 7) return 'ล่วงหน้า 1 สัปดาห์';
+            return `ล่วงหน้า ${d} วัน`;
+        },
 
        async loadArchivedTasks(boardId) {
             this.archivedDrawerOpen = true; // เปิดลิ้นชักทันที

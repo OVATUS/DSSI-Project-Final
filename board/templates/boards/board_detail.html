@@ -12,7 +12,7 @@
     listMoveUrl: '{% url 'list_reorder' board.id %}',
     taskIsArchived: false,
     taskId: null,
-
+    
     manageMembersOpen: false,
     activityDrawerOpen: false,
     activities: [],
@@ -315,7 +315,7 @@
     </div>
 </div>
 
-  {# 3️⃣ พื้นที่อิสระ (Drawers & Modals) - วางไว้ตรงนี้จะไม่โดนตัดขอบ #}
+{# 3️⃣ พื้นที่อิสระ (Drawers & Modals) - วางไว้ตรงนี้จะไม่โดนตัดขอบ #}
   {% include "boards/components/popup_list_form.html" %}
   {% include "boards/components/popup_list_delete.html" %}
   {% include "boards/components/popup_add_member.html" %}
@@ -323,6 +323,6 @@
   {% include "boards/components/popup_task_form.html" %}
   
     
-
+  
 </div> {# 🟢 ปิด Wrapper นอกสุด #}
 {% endblock %}

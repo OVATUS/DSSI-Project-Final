@@ -9,14 +9,48 @@
   {# --- 2. RIGHT SIDE (Notification + Profile + Menu) --- #}
   <div class="flex items-center gap-4">
     
-    {# === NOTIFICATION BELL (เหมือนเดิม) === #}
+    {# === NOTIFICATION BELL (REAL-TIME WEBSOCKET) === #}
     <div
       class="relative"
       x-data="{ 
         open: false, 
         count: 0, 
         notifications: [],
+        socket: null,
         
+        init() {
+            // 1. ดึงข้อมูลครั้งแรกตอนโหลดหน้าเว็บ
+            this.fetchNotifications();
+            
+            // 2. เชื่อมต่อ WebSocket เพื่อรอรับการแจ้งเตือนใหม่
+            this.connectSocket();
+        },
+
+        connectSocket() {
+            const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+            this.socket = new WebSocket(`${wsScheme}://${window.location.host}/ws/notifications/`);
+
+            this.socket.onmessage = (e) => {
+                const data = JSON.parse(e.data);
+                
+                if (data.type === 'notification') {
+                    // ✅ อัปเดตตัวเลขทันที
+                    this.count = data.unread_count;
+                    
+                    // ✅ เล่นเสียงแจ้งเตือน (Optional)
+                    // new Audio('/static/sounds/pop.mp3').play().catch(e => {});
+
+                    // ✅ โหลดรายการใหม่เพื่อให้ Dropdown อัปเดตล่าสุด
+                    this.fetchNotifications();
+                }
+            };
+
+            this.socket.onclose = () => {
+                console.log('Socket closed. Reconnecting...');
+                setTimeout(() => this.connectSocket(), 3000);
+            };
+        },
+
         async fetchNotifications() {
             try {
                 const res = await fetch('/board/notifications/'); 
@@ -35,6 +69,7 @@
                      method: 'POST', 
                      headers: {'X-CSRFToken': '{{ csrf_token }}'} 
                  });
+                 
                  if (boardId) {
                      window.location.href = `/board/${boardId}/`;
                  } else {
@@ -56,7 +91,6 @@
             } catch (e) {}
         }
       }"
-      x-init="fetchNotifications(); setInterval(() => fetchNotifications(), 10000)"
       @click.outside="open = false"
     >
       {# ปุ่มกระดิ่ง #}
@@ -67,6 +101,8 @@
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
         </svg>
+        
+        {# Badge ตัวเลขแจ้งเตือน #}
         <span
           x-show="count > 0"
           x-transition.scale
@@ -91,22 +127,28 @@
           <h3 class="font-bold text-sm text-gray-700">การแจ้งเตือน</h3>
           <button @click="markAllRead()" x-show="notifications.length > 0" class="text-xs text-indigo-600 hover:text-indigo-800 hover:underline font-medium transition-colors">อ่านทั้งหมด</button>
         </div>
+        
         <div class="max-h-[20rem] overflow-y-auto custom-scrollbar bg-white">
           <template x-for="notif in notifications" :key="notif.id">
             <div @click="markAsRead(notif.id, notif.board_id)" class="px-4 py-3 border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors flex gap-3 items-start group" :class="{'bg-blue-50/40': !notif.is_read}">
+              {# Avatar #}
               <div class="shrink-0 relative">
                 <div class="w-9 h-9 rounded-full bg-gray-200 overflow-hidden ring-2 ring-white shadow-sm">
                     <template x-if="notif.actor_avatar"><img :src="notif.actor_avatar" class="w-full h-full object-cover" /></template>
                     <template x-if="!notif.actor_avatar"><div class="w-full h-full bg-gradient-to-br from-indigo-400 to-indigo-600 flex items-center justify-center text-white text-xs font-bold" x-text="notif.actor ? notif.actor.charAt(0).toUpperCase() : 'S'"></div></template>
                 </div>
               </div>
+              {# Text #}
               <div class="flex-1 min-w-0">
                 <p class="text-sm text-gray-800 leading-snug"><span class="font-bold text-gray-900" x-text="notif.actor"></span> <span class="text-gray-600" x-text="notif.message"></span></p>
                 <p class="text-[11px] text-gray-400 mt-1 flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg><span x-text="notif.created_at"></span></p>
               </div>
+              {# Dot (Unread) #}
               <div x-show="!notif.is_read" class="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-sm mt-1.5 shrink-0 animate-pulse"></div>
             </div>
           </template>
+          
+          {# Empty State #}
           <div x-show="notifications.length === 0" class="flex flex-col items-center justify-center py-8 text-gray-400">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
             <span class="text-sm">ไม่มีการแจ้งเตือนใหม่</span>

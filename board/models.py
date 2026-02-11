@@ -81,6 +81,8 @@ class Task(models.Model):
         HIGH = "high", "High"
  
     list = models.ForeignKey('List', on_delete=models.CASCADE, related_name="tasks") 
+    # ผู้สร้างงาน (optional) - บางจุดในโค้ดอ้างถึง task.created_by
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_tasks')
 
     is_completed = models.BooleanField(default=False)  # สถานะเสร็จสิ้น
     completed_at = models.DateTimeField(null=True, blank=True) # เวลาที่เสร็จ (ไว้ทำ Report)
@@ -100,7 +102,18 @@ class Task(models.Model):
     assigned_to = models.ManyToManyField(User, related_name='tasks', blank=True)
     google_event_id = models.CharField(max_length=255, blank=True, null=True, unique=True, help_text="ID อ้างอิงจาก Google Calendar")
     due_date = models.DateTimeField(null=True, blank=True)
-
+    REMINDER_CHOICES = [
+        (0, 'ไม่แจ้งเตือน'),
+        (1, 'ล่วงหน้า 1 วัน'),
+        (2, 'ล่วงหน้า 2 วัน'),
+        (3, 'ล่วงหน้า 3 วัน'),
+        (7, 'ล่วงหน้า 1 สัปดาห์'),
+    ]
+    remind_days = models.IntegerField(
+        choices=REMINDER_CHOICES, 
+        default=1, 
+        verbose_name="แจ้งเตือนล่วงหน้า"
+    )
     status = models.CharField(
         max_length=20,
         choices=Status.choices,
@@ -113,7 +126,7 @@ class Task(models.Model):
         default=Priority.MEDIUM,
     )
 
-    
+    is_reminded = models.BooleanField(default=False)# แจ้งเตือนแล้วหรือยัง (สำหรับระบบแจ้งเตือน)
     created_at = models.DateTimeField(auto_now_add=True)
     
    
@@ -126,6 +139,11 @@ class Task(models.Model):
 
     def __str__(self):
         return f"{self.title} ({self.get_status_display()})"
+
+    @property
+    def creator_name(self):
+        """Return a safe creator display name (fallback to 'ระบบ' when missing)."""
+        return self.created_by.username if self.created_by else 'ระบบ'
 
     
     @property

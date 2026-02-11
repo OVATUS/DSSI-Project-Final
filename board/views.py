@@ -23,6 +23,8 @@ from django.core.mail import send_mail
 import threading
 from django.core.cache import cache
 from django.contrib import messages
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 
 @login_required
 @require_POST
@@ -97,18 +99,21 @@ def board_list(request):
     return render(request, "boards/board_list.html", {"boards": boards})
 
 
-# READ (Detail)
+
 @login_required
 def board_detail(request, board_id):
     board = get_object_or_404(
         Board.objects.filter(
             Q(created_by=request.user) | Q(members=request.user)
-        ).distinct(),  # <--- พระเอกของเราอยู่ตรงนี้ครับ
+        ).distinct(),  
         id=board_id
     )
-    # ... (code ส่วนดึง lists, tasks เหมือนเดิม)
+    
     lists = List.objects.filter(board=board).order_by('position').prefetch_related(
-        Prefetch('tasks', queryset=Task.objects.prefetch_related('assigned_to', 'labels').select_related('list').order_by('position'))
+        Prefetch(
+            'tasks',
+            queryset=Task.objects.filter(is_archived=False).prefetch_related('assigned_to', 'labels').select_related('list').order_by('position')
+        )
     )
 
     users = User.objects.filter(
@@ -164,27 +169,59 @@ def toggle_task_completion(request, task_id):
     task.is_completed = not task.is_completed
     task.save()
 
+    import threading
+
     # -----------------------------------------------
-    # ✅ ส่วนแจ้งเตือน DISCORD (เพิ่มใหม่)
+    # ✅ 1. แจ้งเตือน Notification & Real-time (เฉพาะตอนเสร็จ)
+    # -----------------------------------------------
+    if task.is_completed:
+        # เตรียมรายชื่อคนที่จะแจ้งเตือน (คนสร้าง + คนรับผิดชอบทุกคน ยกเว้นตัวเอง)
+        target_users = set()
+        if task.created_by and task.created_by != request.user:
+            target_users.add(task.created_by)
+        
+        for assignee in task.assigned_to.all():
+            if assignee != request.user:
+                target_users.add(assignee)
+
+        channel_layer = get_channel_layer()
+        for user in target_users:
+            # A. ลง Database
+            Notification.objects.create(
+                recipient=user,
+                actor=request.user,
+                task=task,
+                message=f"ได้ทำงาน '{task.title}' เสร็จเรียบร้อยแล้ว! 🎉"
+            )
+
+            # B. ส่ง Real-time
+            unread_count = Notification.objects.filter(recipient=user, is_read=False).count()
+            async_to_sync(channel_layer.group_send)(
+                f"user_{user.id}",
+                {
+                    "type": "send_notification",
+                    "message": f"งานเสร็จแล้ว! '{task.title}'",
+                    "unread_count": unread_count
+                }
+            )
+
+    # -----------------------------------------------
+    # ✅ 2. แจ้งเตือน DISCORD
     # -----------------------------------------------
     webhook_url = task.list.board.discord_webhook_url
-    
-    # แจ้งเตือนเฉพาะตอนที่ติ๊ก "เสร็จ" (True) เท่านั้น (ตอนเอาออกไม่ต้องแจ้งก็ได้เดี๋ยวรก)
     if webhook_url and task.is_completed:
-        import threading
         msg = (
             f"✅ **Task Completed!** 🎉\n"
             f"**Task:** {task.title}\n"
             f"**List:** {task.list.title}\n"
             f"**Completed By:** {request.user.username}"
         )
-        # ใช้ Thread เพื่อไม่ให้ User ต้องรอ Request Discord ตอบกลับ
         threading.Thread(target=send_discord_notify, args=(msg, webhook_url)).start()
 
     return JsonResponse({
         'success': True, 
         'is_completed': task.is_completed,
-        'completed_at': task.completed_at
+        'completed_at': task.completed_at.isoformat() if task.completed_at else None
     })
 
 
@@ -212,7 +249,7 @@ def list_create(request, board_id):
                 board=board,
                 title=title,
                 position=max_pos + 1
-            )
+            )          
         return redirect("board_detail", board_id=board.id)
     form = ListForm()
     return render(request, "boards/list_form.html", {"form": form, "board": board})
@@ -255,8 +292,6 @@ def list_delete(request, list_id):
         return redirect("board_detail", board_id=board_id)
 
     return render(request, "boards/list_confirm_delete.html", {"list": list_obj})
-# แก้ไขเฉพาะส่วน logic ของ view
-from django.db.models import Q  # อย่าลืม import Q ด้านบนสุดของไฟล์ด้วยนะครับ
 
 @login_required
 def task_create(request, list_id):
@@ -271,22 +306,22 @@ def task_create(request, list_id):
     if request.method == "POST":
         form = TaskForm(request.POST)
         if form.is_valid():
-            # 2. บันทึก Task เบื้องต้น (ยังไม่ใส่ Many-to-Many)
+            # 2. บันทึก Task เบื้องต้น
             task = form.save(commit=False)
             task.created_by = request.user
             task.list = list_obj
             task.save() 
             
-            # 3. จัดการ Labels (Many-to-Many)
+            # 3. จัดการ Labels
             label_ids = request.POST.getlist('labels')
             if label_ids:
                 task.labels.set(label_ids)
 
-            # 4. จัดการ Assignees (Many-to-Many) ✅ [ส่วนที่แก้]
-            assignee_ids = request.POST.getlist('assigned_to') # รับเป็น list หลายคน
+            # 4. จัดการ Assignees
+            assignee_ids = request.POST.getlist('assigned_to')
             if assignee_ids:
                 users_to_assign = User.objects.filter(id__in=assignee_ids)
-                task.assigned_to.set(users_to_assign) # บันทึกหลายคน
+                task.assigned_to.set(users_to_assign)
 
             # บันทึก Log
             log_activity(list_obj.board, request.user, f"สร้างการ์ด '{task.title}' ในรายการ '{list_obj.title}'")
@@ -294,19 +329,32 @@ def task_create(request, list_id):
             import threading
 
             # ==================================================
-            # 5. แจ้งเตือน Notification & Email (วนลูปแจ้งทุกคน) ✅
+            # 5. แจ้งเตือน Notification (Real-time) & Email
             # ==================================================
             assigned_users = task.assigned_to.all()
             for user in assigned_users:
                 if user != request.user:
-                    # แจ้งเตือนในเว็บ
+                    # A. สร้าง Notification ลง Database
                     Notification.objects.create(
                         recipient=user,
                         actor=request.user,
                         task=task,
                         message=f"ได้มอบหมายงานใหม่ '{task.title}' ให้คุณ"
                     )
-                    # แจ้งเตือนทางอีเมล
+
+                    # B. ✅ ส่งสัญญาณ Real-time เข้าห้องส่วนตัวของ User
+                    unread_count = Notification.objects.filter(recipient=user, is_read=False).count()
+                    channel_layer = get_channel_layer()
+                    async_to_sync(channel_layer.group_send)(
+                        f"user_{user.id}",  # ส่งหา user คนนี้โดยเฉพาะ
+                        {
+                            "type": "send_notification",
+                            "message": f"งานเข้า! '{task.title}'",
+                            "unread_count": unread_count
+                        }
+                    )
+
+                    # C. ส่ง Email (แยก Thread)
                     try:
                         threading.Thread(
                             target=send_email_notify, 
@@ -316,13 +364,12 @@ def task_create(request, list_id):
                         print(f"Email Thread Error: {e}")
 
             # ==================================================
-            # 6. แจ้งเตือน DISCORD (โชว์ชื่อทุกคน) ✅
+            # 6. แจ้งเตือน DISCORD
             # ==================================================
             try:
                 webhook_url = list_obj.board.discord_webhook_url 
                 
                 if webhook_url:
-                    # รวมชื่อทุกคนคั่นด้วยลูกน้ำ
                     assignee_names = ", ".join([u.username for u in assigned_users]) if assigned_users else "Unassigned"
                     
                     discord_msg = (
@@ -403,25 +450,33 @@ def task_update(request, task_id):
         id=task_id
     )
 
-    if request.method == "POST":
-        # 1. จำรายชื่อคนเก่าไว้ก่อน (เปรียบเทียบหาคนใหม่)
-        old_assignee_ids = set(task.assigned_to.values_list('id', flat=True))
+    # จำค่าเดิมไว้เปรียบเทียบ
+    old_assignee_ids = set(task.assigned_to.values_list('id', flat=True))
+    old_due_date = task.due_date
+    old_remind_days = task.remind_days # ✅ เพิ่ม: จำค่าวันเตือนเดิม
 
+    if request.method == "POST":
         form = TaskForm(request.POST, instance=task)
         if form.is_valid():
-            updated_task = form.save()
+            updated_task = form.save(commit=False)
             
-            # จัดการ Labels
-            label_ids = request.POST.getlist('labels')
-            updated_task.labels.set(label_ids)
+            # ✅ เช็ค: ถ้ามีการเปลี่ยน "วันกำหนดส่ง" หรือ "วันแจ้งเตือน" ให้ Reset สถานะการเตือน
+            if updated_task.due_date != old_due_date or updated_task.remind_days != old_remind_days:
+                updated_task.is_reminded = False
+            
+            updated_task.save()
+            form.save_m2m() # บันทึก Many-to-Many
 
-            # 2. จัดการ Assignees ใหม่ (Many-to-Many) ✅
+            # -----------------------------------------------
+            # A. จัดการ Assignees ใหม่ (แบบ Manual เพื่อหาความเปลี่ยนแปลง)
+            # -----------------------------------------------
+            label_ids = request.POST.getlist('labels')
+            if label_ids:
+                 updated_task.labels.set(label_ids)
+
             new_assignee_ids = request.POST.getlist('assigned_to')
-            
-            # แปลงเป็น Set ของ Int เพื่อเทียบกับ DB
             new_assignee_ids_set = set(map(int, new_assignee_ids)) if new_assignee_ids else set()
             
-            # อัปเดตคนรับผิดชอบใน DB
             users_to_assign = User.objects.filter(id__in=new_assignee_ids_set)
             updated_task.assigned_to.set(users_to_assign)
 
@@ -429,28 +484,65 @@ def task_update(request, task_id):
             added_ids = new_assignee_ids_set - old_assignee_ids
             added_users = User.objects.filter(id__in=added_ids)
 
+            channel_layer = get_channel_layer()
             import threading
 
             # -----------------------------------------------
-            # 3. แจ้งเตือน Internal Notification (เฉพาะคนใหม่) ✅
+            # ✅ B. แจ้งเตือนคนใหม่ (Real-time) - แก้ไข Indentation แล้ว
             # -----------------------------------------------
             for user in added_users:
                 if user != request.user:
+                    # 1. ลง DB
                     Notification.objects.create(
                         recipient=user,
                         actor=request.user,
                         task=updated_task,
                         message=f"ได้มอบหมายงาน '{updated_task.title}' ให้คุณ"
                     )
+                    
+                    # 2. ส่ง Real-time (ต้องอยู่ใน Loop เพื่อส่งหาทีละคน)
+                    unread_count = Notification.objects.filter(recipient=user, is_read=False).count()
+                    async_to_sync(channel_layer.group_send)(
+                        f"user_{user.id}",
+                        {
+                            "type": "send_notification",
+                            "message": f"งานเข้าใหม่! '{updated_task.title}'",
+                            "unread_count": unread_count
+                        }
+                    )
 
             # -----------------------------------------------
-            # 4. แจ้งเตือน DISCORD (ถ้าทีมเปลี่ยน) ✅
+            # ✅ C. แจ้งเตือนเมื่อเปลี่ยน Due Date (Real-time)
+            # -----------------------------------------------
+            if old_due_date != updated_task.due_date:
+                date_msg = updated_task.due_date.strftime('%d/%m/%Y') if updated_task.due_date else "ไม่มีกำหนด"
+                
+                # แจ้งทุกคนที่รับผิดชอบงาน
+                for user in updated_task.assigned_to.all():
+                    if user != request.user:
+                        # ลง DB
+                        Notification.objects.create(
+                            recipient=user,
+                            actor=request.user,
+                            task=updated_task,
+                            message=f"ได้เปลี่ยนกำหนดส่งงาน '{updated_task.title}' เป็น {date_msg}"
+                        )
+                        # ส่ง Real-time
+                        unread_count = Notification.objects.filter(recipient=user, is_read=False).count()
+                        async_to_sync(channel_layer.group_send)(
+                            f"user_{user.id}",
+                            {
+                                "type": "send_notification",
+                                "message": f"⏰ เลื่อนกำหนดส่งงาน '{updated_task.title}'",
+                                "unread_count": unread_count
+                            }
+                        )
+
+            # -----------------------------------------------
+            # D. แจ้งเตือน DISCORD
             # -----------------------------------------------
             webhook_url = task.list.board.discord_webhook_url
-
-            # ถ้าคนเก่า ไม่เท่ากับ คนใหม่ แสดงว่ามีการเปลี่ยนแปลงทีม
             if webhook_url and (old_assignee_ids != new_assignee_ids_set):
-                # ดึงชื่อคนทั้งหมดใหม่
                 current_assignees = updated_task.assigned_to.all()
                 assignee_names = ", ".join([u.username for u in current_assignees]) if current_assignees else "Unassigned"
                 
@@ -501,6 +593,7 @@ def task_move(request):
         # รับ list ของ ID ทั้งหมดในคอลัมน์นั้น (เรียงมาแล้วจาก JS)
         order_str = request.POST.get("order", "") 
     
+        # ค้นหา Task (เช็คสิทธิ์ Owner หรือ Member)
         task = get_object_or_404(
             Task.objects.filter(
                 Q(list__board__created_by=request.user) | Q(list__board__members=request.user)
@@ -709,14 +802,14 @@ def add_member(request, board_id):
             ).exists()
             
             if not existing_invite:
-                # 1. สร้างคำเชิญ (เหมือนเดิม)
+                # 1. สร้างคำเชิญ
                 BoardInvitation.objects.create(
                     board=board,
                     sender=request.user,
                     recipient=user_to_invite
                 )
                 
-                #  2. สร้าง Notification (เพิ่มใหม่ตรงนี้!)
+                # 2. สร้าง Notification ลง DB
                 Notification.objects.create(
                     recipient=user_to_invite,
                     actor=request.user,
@@ -724,10 +817,23 @@ def add_member(request, board_id):
                     message=f"ได้เชิญคุณเข้าร่วมบอร์ด '{board.name}'"
                 )
 
+                # ✅ 3. ส่ง Real-time Notification
+                channel_layer = get_channel_layer()
+                unread_count = Notification.objects.filter(recipient=user_to_invite, is_read=False).count()
+                async_to_sync(channel_layer.group_send)(
+                    f"user_{user_to_invite.id}",
+                    {
+                        "type": "send_notification",
+                        "message": f"คุณได้รับเชิญเข้าบอร์ด '{board.name}'",
+                        "unread_count": unread_count
+                    }
+                )
+
     except User.DoesNotExist:
         pass 
         
     return redirect("board_detail", board_id=board.id)
+
 @login_required
 @require_POST
 def remove_member(request, board_id, user_id):
@@ -815,7 +921,7 @@ def get_comments(request, task_id):
 def add_comment(request, task_id):
     task = get_object_or_404(Task, id=task_id)
     
-    # Check สิทธิ์เหมือนเดิม
+    # Check สิทธิ์
     if request.user != task.list.board.created_by and request.user not in task.list.board.members.all():
          return JsonResponse({'error': 'Unauthorized'}, status=403)
 
@@ -825,20 +931,36 @@ def add_comment(request, task_id):
         if not content:
             return JsonResponse({'error': 'Empty content'}, status=400)
 
-        # 1. สร้างคอมเมนต์
+        # 1. สร้างคอมเมนต์ลง DB
         comment = Comment.objects.create(task=task, author=request.user, content=content)
         
-        
-        if task.assigned_to and task.assigned_to != request.user:
-            Notification.objects.create(
-                recipient=task.assigned_to,
-                actor=request.user,
-                task=task,
-                message=f"ได้แสดงความคิดเห็นในงาน '{task.title}': \"{content[:20]}{'...' if len(content)>20 else ''}\""
-            )
-            # หมายเหตุ: ผมเพิ่มตัดคำ (slice) ให้โชว์เนื้อหาคอมเมนต์สั้นๆ ในแจ้งเตือนด้วย จะได้ดูรู้เรื่องขึ้นครับ
+        # ==================================================
+        # ⚠️ แจ้งเตือน Notification (Real-time)
+        # ==================================================
+        # วนลูปแจ้งทุกคนที่รับผิดชอบงานนี้ (ยกเว้นตัวเราเอง)
+        for user in task.assigned_to.all():
+            if user != request.user:
+                # A. สร้าง Notification ลง Database
+                Notification.objects.create(
+                    recipient=user,
+                    actor=request.user,
+                    task=task,
+                    message=f"ได้แสดงความคิดเห็นในงาน '{task.title}': \"{content[:20]}{'...' if len(content)>20 else ''}\""
+                )
 
-        # 2. เตรียมข้อมูลส่งกลับ
+                # B. ✅ ส่งสัญญาณ Real-time เข้าห้องส่วนตัวของ User
+                unread_count = Notification.objects.filter(recipient=user, is_read=False).count()
+                channel_layer = get_channel_layer()
+                async_to_sync(channel_layer.group_send)(
+                    f"user_{user.id}",
+                    {
+                        "type": "send_notification",
+                        "message": f"มีความคิดเห็นใหม่ในงาน '{task.title}'",
+                        "unread_count": unread_count
+                    }
+                )
+
+        # 2. เตรียมข้อมูลส่งกลับ (Response)
         avatar_url = comment.author.profile_image.url if comment.author.profile_image else None
 
         return JsonResponse({
@@ -1491,7 +1613,7 @@ def send_email_notify(task, recipient):
         f" ชื่องาน: {task.title}\n"
         f" กำหนดส่ง: {task.due_date if task.due_date else 'ไม่ระบุ'}\n"
         f" โปรเจกต์: {task.list.board.name}\n"
-        f" มอบหมายโดย: {task.created_by.username}\n\n"
+        f" มอบหมายโดย: {task.created_by.username if task.created_by else 'ระบบ'}\n\n"
         f"ตรวจสอบรายละเอียดได้ที่เว็บไซต์ของเรา"
     )
     

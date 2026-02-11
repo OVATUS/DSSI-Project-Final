@@ -27,6 +27,7 @@
     taskAssignedTo = [{% for u in task.assigned_to.all %}{{ u.id }},{% endfor %}];
     taskPriority = '{{ task.priority }}';
     taskDueDate = '{{ task.due_date|default_if_none:''|date:'Y-m-d\\TH:i' }}';
+    taskRemindDays = {{ task.remind_days|default:0 }};
     taskIsArchived = {% if task.is_archived %}true{% else %}false{% endif %};
     
     if (typeof checklistItems !== 'undefined') {
@@ -71,9 +72,22 @@
         {# Checkbox (ลอยขวาบนสุด) #}
         <button 
             type="button"
-            @click.stop="fetch('{% url 'task_toggle_complete' task.id %}', { method: 'POST', headers: {'X-CSRFToken': '{{ csrf_token }}'} })
-                    .then(res => res.json())
-                    .then(data => { if(data.success) isCompleted = data.is_completed })"
+            @click.stop="(async () => {
+                    try {
+                        const res = await fetch('{% url 'task_toggle_complete' task.id %}', { method: 'POST', headers: {'X-CSRFToken': '{{ csrf_token }}'} });
+                        if (!res.ok) {
+                            const text = await res.text();
+                            console.error('toggle-complete error', res.status, text);
+                            alert('เกิดข้อผิดพลาดจากเซิร์ฟเวอร์');
+                        } else {
+                            const data = await res.json();
+                            if (data && data.success) isCompleted = data.is_completed;
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+                    }
+                })()"
             class="w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all duration-200 shadow-sm shrink-0"
             :class="isCompleted ? 'bg-green-500 border-green-500 text-white' : 'border-gray-200 hover:border-indigo-400 bg-white opacity-0 group-hover:opacity-100'"
             title="ทำเครื่องหมายว่าเสร็จ"
