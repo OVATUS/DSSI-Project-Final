@@ -59,6 +59,9 @@ urlpatterns = [
     # API สำหรับ Search 
     path("api/search/", search_boards_api, name="search_boards_api"),
 
+    # API สำหรับส่งแจ้งเตือนอัตโนมัติ
+    path("api/send-reminders/", send_task_reminders, name="send_task_reminders"),
+
     # notification
    path('notifications/', get_notifications, name='get_notifications'),
     path('notifications/<int:pk>/read/', read_notification, name='read_notification'),

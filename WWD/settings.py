@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
+import sys
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -43,7 +44,7 @@ SECRET_KEY = 'django-insecure-$oi+^dw9a@r0csjkyd@%(%@2&#2-tt8$4ybg_&&%v*cqizgrmb
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'testserver']
 
 AUTH_USER_MODEL = "users.User"
 
@@ -156,9 +157,11 @@ CHANNEL_LAYERS = {
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
+
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+# Set to Thailand timezone so displayed/stored times match Bangkok time
+TIME_ZONE = 'Asia/Bangkok'
 
 USE_I18N = True
 
@@ -188,3 +191,23 @@ EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
 
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
+
+# ==========================================
+# ⏰ APScheduler Configuration (Automated Task Reminders)
+# ==========================================
+# Initialize the background scheduler on startup when Django loads
+def start_background_scheduler():
+    """
+    Initialize APScheduler for automated task reminders.
+    Runs once per Django instance to avoid duplicate schedulers.
+    """
+    try:
+        from board.scheduler import start_scheduler
+        start_scheduler()
+    except Exception as e:
+        print(f"⚠️  Could not start scheduler: {e}")
+
+# Only start scheduler in non-testing environments
+if 'test' not in sys.argv and not os.environ.get('RUNNING_TESTS'):
+    start_background_scheduler()

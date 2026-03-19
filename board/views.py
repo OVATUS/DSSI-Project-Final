@@ -10,7 +10,8 @@ from django.db.models import Max
 from django.db.models import Q, Prefetch
 import json
 from django.utils import timezone
-from datetime import timedelta
+from django.utils.timezone import localtime
+from datetime import timedelta 
 from django.db.models import Count
 from django.db.models.functions import TruncDate
 from google_auth_oauthlib.flow import Flow
@@ -25,6 +26,7 @@ from django.core.cache import cache
 from django.contrib import messages
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+from django.utils.dateparse import parse_datetime, parse_date
 
 # ==========================================
 # 1. Main Dashboard & Project Views
@@ -311,9 +313,7 @@ def board_create(request):
             board = form.save(commit=False)
             board.created_by = request.user
             board.save()
-
-            # ✅ สร้าง 3 ลิสต์เริ่มต้นให้บอร์ดนี้อัตโนมัติ
-            # (กันกรณีเผื่อเรียกซ้ำ ไม่ให้สร้างซ้ำ)
+            
             if not board.lists.exists():
                 List.objects.create(board=board, title="TO DO",  position=1)
                 List.objects.create(board=board, title="Doing", position=2)
@@ -388,34 +388,35 @@ def board_delete(request, board_id):
 @require_POST
 def toggle_star_board(request, board_id):
     board = get_object_or_404(Board, id=board_id)
-    
-    # ตรวจสอบสิทธิ์ (ต้องเป็นสมาชิกบอร์ดถึงจะติดดาวได้)
-    if request.user not in board.members.all() and board.created_by != request.user:
-        return JsonResponse({'error': 'Permission denied'}, status=403)
 
-    if request.user in board.starred_by.all():
-        board.starred_by.remove(request.user)
-        is_starred = False
-    else:
-        board.starred_by.add(request.user)
-        is_starred = True
+    is_owner = (board.created_by == request.user)
+    is_member = board.members.filter(id=request.user.id).all() 
 
-    return JsonResponse({'is_starred': is_starred})
+    if is_owner or is_member:
+        if request.user in board.starred_by.all():
+            board.starred_by.remove(request.user)
+            is_starred = False
+        else:
+            board.starred_by.add(request.user)
+            is_starred = True
+            
+        return JsonResponse({'is_starred': is_starred})
 
+    return JsonResponse({'error': 'Permission denied'}, status=403)
 
 @login_required
 @require_POST
 def leave_board(request, board_id):
     board = get_object_or_404(Board, id=board_id)
-    
+    user = request.user
     # ป้องกันเจ้าของบอร์ดกดออก (Backend Validation)
-    if request.user == board.created_by:
+    if user == board.created_by:
         return redirect('board_detail', board_id=board.id)
 
-    if request.user in board.members.all():
-        board.members.remove(request.user)
-        # (Option) อยากบันทึก Log การออกด้วยไหม? ถ้าอยากก็ Uncomment บรรทัดล่างครับ
-        log_activity(board, request.user, f"ได้ออกจากบอร์ด '{board.name}'")
+    if user in board.members.all():
+        board.members.remove(user)
+
+        log_activity(board, user, f"ได้ออกจากบอร์ด '{board.name}'")
         
     return redirect('project_page') # ออกเสร็จเด้งกลับหน้าแรก
 
@@ -524,10 +525,6 @@ def list_reorder(request, board_id):
     return JsonResponse({"success": True})
 
 
-
-
-
- 
 # ==========================================
 # 4. Task Management
 # ==========================================
@@ -565,7 +562,6 @@ def task_create(request, list_id):
             # บันทึก Log
             log_activity(list_obj.board, request.user, f"สร้างการ์ด '{task.title}' ในรายการ '{list_obj.title}'")
             
-            import threading
 
             # ==================================================
             # 5. แจ้งเตือน Notification (Real-time) & Email
@@ -605,11 +601,18 @@ def task_create(request, list_id):
             # ==================================================
             # 6. แจ้งเตือน DISCORD
             # ==================================================
-            try:
-                webhook_url = list_obj.board.discord_webhook_url 
-                
-                if webhook_url:
-                    assignee_names = ", ".join([u.username for u in assigned_users]) if assigned_users else "Unassigned"
+            webhook_url = list_obj.board.discord_webhook_url 
+
+            if webhook_url:
+                try:
+                    if assigned_users:
+                        names = []
+                        for u in assigned_users:
+                            names.append(u.username)
+                        assignee_names = ", ".join(names) # เอามาต่อกันคั่นด้วยลูกน้ำ
+                    else:
+                        # ถ้าไม่มีคน ให้บอกว่า Unassigned
+                        assignee_names = "Unassigned"
                     
                     discord_msg = (
                         f"🆕 **New Task Created!**\n"
@@ -624,8 +627,8 @@ def task_create(request, list_id):
                         args=(discord_msg, webhook_url)
                     ).start()
                 
-            except Exception as e:
-                print(f"Discord Notify Error: {e}")
+                except Exception as e:
+                    print(f"Discord Notify Error: {e}")
 
             return redirect("board_detail", board_id=list_obj.board.id)
     else:
@@ -663,7 +666,7 @@ def task_update(request, task_id):
             form.save_m2m() # บันทึก Many-to-Many
 
             # -----------------------------------------------
-            # A. จัดการ Assignees ใหม่ (แบบ Manual เพื่อหาความเปลี่ยนแปลง)
+            # A. จัดการ Assignees ใหม่ 
             # -----------------------------------------------
             label_ids = request.POST.getlist('labels')
             if label_ids:
@@ -683,7 +686,7 @@ def task_update(request, task_id):
             import threading
 
             # -----------------------------------------------
-            # ✅ B. แจ้งเตือนคนใหม่ (Real-time) - แก้ไข Indentation แล้ว
+            # ✅ B. แจ้งเตือนคนใหม่ (Real-time) 
             # -----------------------------------------------
             for user in added_users:
                 if user != request.user:
@@ -710,7 +713,13 @@ def task_update(request, task_id):
             # ✅ C. แจ้งเตือนเมื่อเปลี่ยน Due Date (Real-time)
             # -----------------------------------------------
             if old_due_date != updated_task.due_date:
-                date_msg = updated_task.due_date.strftime('%d/%m/%Y') if updated_task.due_date else "ไม่มีกำหนด"
+                if updated_task.due_date:
+                    if isinstance(updated_task.due_date, datetime.datetime):
+                        date_msg = localtime(updated_task.due_date).strftime('%d/%m/%Y')
+                    else:
+                        date_msg = updated_task.due_date.strftime('%d/%m/%Y')
+                else:
+                    date_msg = "ไม่มีกำหนด"
                 
                 # แจ้งทุกคนที่รับผิดชอบงาน
                 for user in updated_task.assigned_to.all():
@@ -728,7 +737,7 @@ def task_update(request, task_id):
                             f"user_{user.id}",
                             {
                                 "type": "send_notification",
-                                "message": f"⏰ เลื่อนกำหนดส่งงาน '{updated_task.title}'",
+                                "message": f" เลื่อนกำหนดส่งงาน '{updated_task.title}'",
                                 "unread_count": unread_count
                             }
                         )
@@ -851,7 +860,6 @@ def toggle_task_completion(request, task_id):
     task.is_completed = not task.is_completed
     task.save()
 
-    import threading
 
     # -----------------------------------------------
     # ✅ 1. แจ้งเตือน Notification & Real-time (เฉพาะตอนเสร็จ)
@@ -928,7 +936,6 @@ def toggle_task_archive(request, task_id):
 
 @login_required
 def get_archived_tasks(request, board_id):
-    # 1. แก้ไขการหา Board: ให้เจอทั้ง "คนสร้าง" และ "สมาชิก"
     board = get_object_or_404(
         Board, 
         Q(members=request.user) | Q(created_by=request.user),
@@ -946,7 +953,7 @@ def get_archived_tasks(request, board_id):
         'id': task.id,
         'title': task.title,
         'list_title': task.list.title,
-        'archived_at': task.created_at.strftime('%d/%m/%Y %H:%M')
+        'archived_at': localtime(task.created_at).strftime('%d/%m/%Y %H:%M')
     } for task in tasks]
 
     return JsonResponse({'tasks': data})
@@ -954,7 +961,6 @@ def get_archived_tasks(request, board_id):
 @require_POST
 @login_required
 def api_update_task_date(request):
-    import json
     try:
         data = json.loads(request.body)
         task_id = data.get('task_id')
@@ -970,8 +976,7 @@ def api_update_task_date(request):
             id=task_id
         )
         
-        from django.utils.dateparse import parse_datetime, parse_date
-        
+       
         new_date = parse_date(new_date_str)
         
         if task.due_date:
@@ -979,6 +984,7 @@ def api_update_task_date(request):
             task.due_date = task.due_date.replace(year=new_date.year, month=new_date.month, day=new_date.day)
         else:
             # ถ้าของเดิมไม่มีเวลา ให้ตั้งเป็นเที่ยงวัน
+            
             task.due_date = timezone.make_aware(datetime.datetime.combine(new_date, datetime.time(12, 0)))
 
         task.save()
@@ -1044,10 +1050,7 @@ def delete_label(request, label_id):
 @login_required
 @require_POST
 def create_checklist_item(request, task_id):
-    task = get_object_or_404(Task, id=task_id)
-    
-    # ตรวจสอบสิทธิ์ (ถ้าจำเป็น): เช่น user ต้องอยู่ใน board นี้
-    
+    task = get_object_or_404(Task, id=task_id)    
     try:
         data = json.loads(request.body)
         content = data.get('content')
@@ -1105,7 +1108,7 @@ def create_attachment(request, task_id):
             'filename': attachment.filename(),
             'url': attachment.file.url,
             'is_image': attachment.is_image(),
-            'uploaded_at': attachment.uploaded_at.strftime('%d/%m/%Y %H:%M')
+            'uploaded_at': localtime(attachment.uploaded_at).strftime('%d/%m/%Y %H:%M')
         })
         
     return JsonResponse({'success': False, 'error': 'No file uploaded'}, status=400)
@@ -1141,7 +1144,7 @@ def get_comments(request, task_id):
             'author': c.author.username,
             'author_avatar': avatar_url, 
             'content': c.content,
-            'created_at': c.created_at.strftime('%d/%m/%Y %H:%M'),
+            'created_at': localtime(c.created_at).strftime('%d/%m/%Y %H:%M'),
         })
     return JsonResponse({'comments': data})
 
@@ -1197,7 +1200,7 @@ def add_comment(request, task_id):
             'author': comment.author.username,
             'author_avatar': avatar_url,
             'content': comment.content,
-            'created_at': comment.created_at.strftime('%d/%m/%Y %H:%M'),
+            'created_at': localtime(comment.created_at).strftime('%d/%m/%Y %H:%M'),
         })
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
@@ -1343,7 +1346,7 @@ def get_notifications(request):
             'actor': n.actor.username if n.actor else 'ระบบ',
             'actor_avatar': avatar_url,
             'message': n.message,  
-            'created_at': n.created_at.strftime('%d/%m %H:%M'),
+            'created_at': localtime(n.created_at).strftime('%d/%m %H:%M'),
             'is_read': n.is_read,
             'board_id': board_id,  
         })
@@ -1393,7 +1396,7 @@ def get_board_activities(request, board_id):
         'actor': act.actor.username,
         'actor_initial': act.actor.username[0].upper(), # ตัวอักษรแรกของชื่อ
         'action': act.action,
-        'created_at': act.created_at.strftime('%d/%m/%Y %H:%M')
+        'created_at': localtime(act.created_at).strftime('%d/%m/%Y %H:%M')
     } for act in activities]
     
     return JsonResponse({'activities': data})
@@ -1453,7 +1456,7 @@ def api_calendar_events(request):
         })
 
     # ==========================================
-    # 2. CLASS SCHEDULE: ตารางเรียน (แสดงซ้ำทุกสัปดาห์)
+    # 2. CLASS SCHEDULE: ตารางเรียน 
     # ==========================================
     # Map วันให้ตรงกับ format ของ FullCalendar (0=Sun, 1=Mon, ...)
     day_map = {
@@ -1713,7 +1716,7 @@ def sync_google_classroom_page(request):
         service = build('calendar', 'v3', credentials=creds)
 
         # ดึงปฏิทินทั้งหมด (รวมถึงที่ซ่อนอยู่ด้วย showHidden=True)
-        calendar_list = service.calendarList().list(showHidden=True).execute().get('items', [])
+        calendar_list = service.calendarList().list(showHidden=False).execute().get('items', [])
         
         # กรองปฏิทินที่ไม่ใช่วิชาเรียนออกเบื้องต้น
         filtered_calendars = []
@@ -1843,7 +1846,7 @@ def sync_google_classroom_confirm(request):
                             is_completed=False,
                             is_archived=False
                             
-                            # ❌ ตัด created_by ออก เพราะใน Model ไม่มี field นี้
+                        
                         )
                         
                         # ✅ เพิ่มคนรับผิดชอบ (Assigned To) เป็นคนกด Sync
@@ -1879,13 +1882,15 @@ def sync_google_classroom_confirm(request):
 
 @login_required
 def reporting_view(request):
-    # ... (ส่วน Filter บอร์ด เหมือนเดิม) ...
+    # ==========================================
+    # ส่วน Filter บอร์ด และดึงข้อมูล Tasks
+    # ==========================================
     user_boards = Board.objects.filter(Q(created_by=request.user) | Q(members=request.user)).distinct()
     tasks = Task.objects.filter(
-    Q(list__board__created_by=request.user) | Q(list__board__members=request.user)
-).distinct() \
- .select_related('list', 'list__board') \
- .prefetch_related('assigned_to', 'labels')
+        Q(list__board__created_by=request.user) | Q(list__board__members=request.user)
+    ).distinct() \
+    .select_related('list', 'list__board') \
+    .prefetch_related('assigned_to', 'labels')
 
     selected_board_id = request.GET.get('board_id')
     if selected_board_id and selected_board_id != 'all':
@@ -1922,27 +1927,31 @@ def reporting_view(request):
         'low': tasks.filter(priority='low', is_completed=False).count(),
     }
 
-    # Chart 2: Trend
+    # Chart 2: Trend (✅ แก้ไขบั๊ก NoneType ตรงนี้แล้ว)
     last_7_days = timezone.now() - timedelta(days=7)
     completed_trend = (
-        tasks.filter(is_completed=True, completed_at__gte=last_7_days)
+        tasks.filter(
+            is_completed=True, 
+            completed_at__isnull=False, # 👈 กรองค่าว่างออกไปตั้งแต่ระดับ Database
+            completed_at__gte=last_7_days
+        )
         .annotate(date=TruncDate('completed_at'))
         .values('date')
         .annotate(count=Count('id'))
         .order_by('date')
     )
-    trend_labels = [item['date'].strftime('%d/%m') for item in completed_trend]
-    trend_data = [item['count'] for item in completed_trend]
+    
+    # 👈 ดัก if item['date'] อีกชั้นเพื่อความปลอดภัย 100%
+    trend_labels = [item['date'].strftime('%d/%m/%Y') for item in completed_trend if item['date']]
+    trend_data = [item['count'] for item in completed_trend if item['date']]
 
     # Chart 3: Member Workload
     member_stats = tasks.values('assigned_to__username').annotate(total=Count('id')).order_by('-total')
     member_labels = [m['assigned_to__username'] if m['assigned_to__username'] else 'Unassigned' for m in member_stats]
     member_data = [m['total'] for m in member_stats]
 
-    # Chart 4: Task Distribution (แก้ไขจุดที่ Error) ✅
-    # เปลี่ยนจาก 'list__order' เป็น 'list__position'
+    # Chart 4: Task Distribution 
     list_stats = tasks.values('list__title').annotate(count=Count('id')).order_by('list__position')
-    
     list_labels = [l['list__title'] for l in list_stats]
     list_data = [l['count'] for l in list_stats]
 
@@ -1964,12 +1973,11 @@ def reporting_view(request):
         'trend_data': trend_data,
         'member_labels': member_labels,
         'member_data': member_data,
-        'list_labels': list_labels, #  ส่งข้อมูลกราฟใหม่
-        'list_data': list_data,     #  ส่งข้อมูลกราฟใหม่
+        'list_labels': list_labels, 
+        'list_data': list_data,    
     }
 
     return render(request, 'boards/reporting.html', context)
-
 # =========
 # DISCORD NOTIFICATION FUNCTION
 # =========
@@ -2042,3 +2050,159 @@ def send_email_notify(task, recipient):
         print(f" Email sent to {recipient.email}")
     except Exception as e:
         print(f" Email Error: {e}")
+
+
+# ==========================================
+# 18. Automated Reminder System
+# ==========================================
+
+@require_POST
+def send_task_reminders(request):
+    """Send automated reminders for upcoming task deadlines via Web/Email/Discord"""
+    
+    # ✅ ใช้ timezone.now() แทน .date() เพื่อเช็คให้ละเอียด
+    now = timezone.now()
+    today = now.date()
+    
+    tasks = Task.objects.filter(
+        is_completed=False, 
+        due_date__isnull=False, 
+        # ✅ ลบตรงนี้ออก - ยังไม่บันทึกให้ไปตรวจสอบวันที่ก่อน
+    ).select_related('list__board', 'list__board__created_by').prefetch_related('assigned_to')
+
+    count = 0
+    channel_layer = get_channel_layer()
+
+    for task in tasks:
+        # ✅ แก้: ตรวจสอบ remind_days ให้ถูกต้อง
+        if not task.remind_days or task.remind_days < 0: 
+            continue 
+
+        # ✅ แก้: จัดการ datetime vs date ให้ครบถ้วน
+        if isinstance(task.due_date, datetime.datetime):
+            task_due_date = task.due_date.date()
+            task_due_time = task.due_date.time()
+        else:
+            task_due_date = task.due_date
+            task_due_time = datetime.time(0, 0)  # ตั้งเป็นเที่ยงคืน
+
+        # ✅ แก้: คำนวณวันที่ที่ควรเตือน
+        reminder_date = task_due_date - timedelta(days=task.remind_days)
+
+        # ✅ สำคัญ: เช็คก่อนว่าเคยเตือนไปแล้วหรือยัง (ตรวจสอบด้วย reminder_date)
+        # ป้องกันไม่ให้ส่งซ้ำในวันเดียวกัน
+        last_reminder_log = ActivityLog.objects.filter(
+            board=task.list.board,
+            action__contains=f"Reminder: {task.id}"
+        ).order_by('-created_at').first()
+        
+        if last_reminder_log and last_reminder_log.created_at.date() == today:
+            continue  # เตือนไปแล้วในวันนี้
+
+        # ✅ เตือนถ้า: วันนี้ >= วันที่ต้องเตือน
+        if today >= reminder_date:
+            assignees = task.assigned_to.all()
+            if not assignees: 
+                continue
+
+            # ----------------------------------------
+            # A. Web Notification (Real-time) + DB
+            # ----------------------------------------
+            for user in assignees:
+                try:
+                    Notification.objects.create(
+                        recipient=user,
+                        actor=task.list.board.created_by, 
+                        task=task,
+                        message=f"⏳ เตือนความจำ! งาน '{task.title}' ครบกำหนดในอีก {task.remind_days} วัน"
+                    )
+                    
+                    unread_count = Notification.objects.filter(
+                        recipient=user, 
+                        is_read=False
+                    ).count()
+                    
+                    async_to_sync(channel_layer.group_send)(
+                        f"user_{user.id}",
+                        {
+                            "type": "send_notification",
+                            "message": f"⏳ ใกล้ครบกำหนด! '{task.title}'",
+                            "unread_count": unread_count
+                        }
+                    )
+                except Exception as e:
+                    print(f"❌ Web/DB Error for user {user.id}: {e}")
+
+                # ----------------------------------------
+                # B. Email Notification
+                # ----------------------------------------
+                if user.email:
+                    try:
+                        # ✅ แก้: ใช้ localtime ให้ถูกต้อง
+                        if isinstance(task.due_date, datetime.datetime):
+                            formatted_date = localtime(task.due_date).strftime('%d/%m/%Y %H:%M')
+                        else:
+                            formatted_date = task.due_date.strftime('%d/%m/%Y')
+                        
+                        send_mail(
+                            subject=f"⏳ แจ้งเตือนงานใกล้ครบกำหนด: {task.title}",
+                            message=(
+                                f"สวัสดีคุณ {user.username},\n\n"
+                                f"งาน '{task.title}' จะครบกำหนดในวันที่ {formatted_date}\n"
+                                f"(เหลือเวลาอีก {task.remind_days} วัน)\n"
+                                f"โปรเจกต์: {task.list.board.name}\n\n"
+                                f"กรุณาตรวจสอบสถานะงานของคุณ\n\n"
+                                f"ขอบคุณครับ,\nทีมงาน Work Wai D"
+                            ),
+                            from_email=settings.EMAIL_HOST_USER,
+                            recipient_list=[user.email],
+                            fail_silently=False,  # ✅ แก้เป็น False เพื่อให้รู้ error
+                        )
+                        print(f"✅ Email sent to {user.email}")
+                    except Exception as e:
+                        print(f"❌ Email Error for {user.email}: {e}")
+
+            # ----------------------------------------
+            # C. Discord Webhook Notification
+            # ----------------------------------------
+            webhook_url = task.list.board.discord_webhook_url
+            if webhook_url:
+                try:
+                    assignee_names = ", ".join([u.username for u in assignees]) or "ไม่มีผู้รับผิดชอบ"
+                    
+                    if isinstance(task.due_date, datetime.datetime):
+                        formatted_date = localtime(task.due_date).strftime('%d/%m/%Y %H:%M')
+                    else:
+                        formatted_date = task.due_date.strftime('%d/%m/%Y')
+                    
+                    discord_msg = {
+                        "content": (
+                            f"⚠️ **Upcoming Deadline Warning!**\n"
+                            f"**Task:** {task.title}\n"
+                            f"**Board:** {task.list.board.name}\n"
+                            f"**Due Date:** {formatted_date}\n"
+                            f"**Remaining:** {task.remind_days} Days\n"
+                            f"**Assigned To:** {assignee_names}\n"
+                            f"---------------------------------"
+                        )
+                    }
+                    requests.post(webhook_url, json=discord_msg, timeout=5)
+                    print(f"✅ Discord notification sent")
+                except Exception as e:
+                    print(f"❌ Discord Error: {e}")
+
+            # ✅ บันทึก Log แทนการใช้ is_reminded
+            # (เพราะ is_reminded ไม่ควรใช้ - มันจะไม่รีเซตเมื่อเปลี่ยนวันที่)
+            log_activity(
+                task.list.board,
+                request.user if request.user.is_authenticated else task.list.board.created_by,
+                f"Reminder: {task.id} - งาน '{task.title}' ได้รับการเตือน"
+            )
+            
+            count += 1
+
+    return JsonResponse({
+        'success': True, 
+        'message': f'✅ ส่งแจ้งเตือนสำเร็จทั้งหมด {count} รายการ',
+        'sent': count
+    })

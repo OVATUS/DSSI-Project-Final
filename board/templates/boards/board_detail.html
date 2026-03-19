@@ -190,7 +190,7 @@
 
   </div> 
 
-  {# Activity Drawer (แบบสไลด์ข้าง - กลับมาแล้วตามคำขอ!) #}
+  {# Activity Drawer #}
   <div x-cloak x-show="activityDrawerOpen" class="fixed inset-0 z-50 overflow-hidden" role="dialog" aria-modal="true">
     {# Backdrop สีดำจางๆ #}
     <div x-show="activityDrawerOpen" x-transition:enter="ease-in-out duration-500" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="ease-in-out duration-500" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="absolute inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="activityDrawerOpen = false"></div>
@@ -315,7 +315,7 @@
     </div>
 </div>
 
-{# 3️⃣ พื้นที่อิสระ (Drawers & Modals) - วางไว้ตรงนี้จะไม่โดนตัดขอบ #}
+
   {% include "boards/components/popup_list_form.html" %}
   {% include "boards/components/popup_list_delete.html" %}
   {% include "boards/components/popup_add_member.html" %}
